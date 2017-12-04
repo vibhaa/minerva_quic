@@ -1,5 +1,3 @@
-TODO: Add network stack documentation. :)
-
 run ```./add_cert.sh``` to update your certificates
 
 to copy over data to serve from the quic server, run the following commands
@@ -9,7 +7,9 @@ cp -r ~/www.example3.org/ /tmp/quic-data/
 ``` 
 
 If you make any changes to the code, run the following command to recompile:
-```ninja -C out/Debug quic_server quic_client```
+```
+ninja -C out/Debug quic_server quic_client
+```
 
 To run the quic server:
 ```
@@ -38,7 +38,7 @@ python mpc_server.py
 ```
 
 To just get logs for the requested video without viewing it, 
-replace privateip with the private ip of the instance you are runnning the client on and run:
+replace privateip with the private ip of the instance you are running the client on and run:
 ```
 cd ~/video_transport_simulator/implementation/run_exp/
 python run_video.py privateip fastMPC 10 2 blah 5
