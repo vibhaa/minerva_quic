@@ -26,7 +26,7 @@ To request a given file ```myindex_fastMPC.html``` via a quic client on a differ
 
 To load the same via Chrome, replace ip with the public ip of the machine on which the server is running and run
 ```
-google-chrome --user-data-dir=/tmp/chrome-profile   --no-proxy-server   --enable-quic   \
+google-chrome --user-data-dir=/tmp/chrome-profile   --no-proxy-server   --enable-quic --ignore-certificate-errors   \
 --origin-to-force-quic-on=www.example3.org:443   --host-resolver-rules='MAP www.example3.org:443 ip:6121' \
 https://www.example3.org/myindex_fastMPC.html
 ```
