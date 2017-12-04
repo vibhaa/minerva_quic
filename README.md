@@ -12,10 +12,12 @@ If you make any changes to the code, run the following command to recompile:
 ```ninja -C out/Debug quic_server quic_client```
 
 To run the quic server:
-```./out/Debug/quic_server \
-  --quic_response_cache_dir=/tmp/quic-data/www.example3.org \
-  --certificate_file=net/tools/quic/certs/out/leaf_cert.pem \
-  --key_file=net/tools/quic/certs/out/leaf_cert.pkcs8```
+```
+./out/Debug/quic_server \
+--quic_response_cache_dir=/tmp/quic-data/www.example3.org \
+--certificate_file=net/tools/quic/certs/out/leaf_cert.pem \
+--key_file=net/tools/quic/certs/out/leaf_cert.pkcs8
+```
 
 To request a given file ```myindex_fastMPC.html``` via a quic client on a different terminal:
 ```./out/Debug/quic_client --host=127.0.0.1 --port=6121 https://www.example3.org/myindex_fastMPC.html```
