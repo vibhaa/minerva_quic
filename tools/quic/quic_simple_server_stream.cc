@@ -155,8 +155,15 @@ void QuicSimpleServerStream::SendResponse() {
   // response status, send error response. Notice that
   // QuicHttpResponseCache push urls are strictly authority + path only,
   // scheme is not included (see |QuicHttpResponseCache::GetKey()|).
-  string request_url = request_headers_[":authority"].as_string() +
-                       request_headers_[":path"].as_string();
+  string path_string = request_headers_[":path"].as_string();
+  auto pos = path_string.find('?');
+  if (pos != string::npos) {
+    string buffer = path_string.substr(pos + 1 + strlen("buffer="));
+    path_string = path_string.substr(0, pos);
+  }
+
+  string request_url = request_headers_[":authority"].as_string() + path_string;
+
   int response_code;
   const SpdyHeaderBlock& response_headers = response->headers();
   if (!ParseHeaderStatusCode(response_headers, &response_code)) {

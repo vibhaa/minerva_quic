@@ -162,7 +162,17 @@ const QuicHttpResponseCache::Response* QuicHttpResponseCache::GetResponse(
     QuicStringPiece path) const {
   QuicWriterMutexLock lock(&response_mutex_);
 
-  DVLOG(0) << "Request for path " << path;
+  DVLOG(0) << "Request for path with buffer " << path;
+
+  std::vector<QuicStringPiece> pathParts = QuicTextUtils::Split(path, '?');
+
+  if (pathParts.size() >= 2) {
+    path = pathParts[0];
+    if (QuicTextUtils::StartsWith(pathParts[1], "buffer=")){
+      QuicStringPiece buffer = QuicTextUtils::Split(pathParts[1], '=')[1];
+      DVLOG(0) << "Request for path is" << path <<" and buffer is" << buffer;
+    }
+  }
 
   auto it = responses_.find(GetKey(host, path));
   if (it == responses_.end()) {
