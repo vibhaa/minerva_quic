@@ -162,6 +162,8 @@ const QuicHttpResponseCache::Response* QuicHttpResponseCache::GetResponse(
     QuicStringPiece path) const {
   QuicWriterMutexLock lock(&response_mutex_);
 
+  DVLOG(0) << "Request for path " << path;
+
   auto it = responses_.find(GetKey(host, path));
   if (it == responses_.end()) {
     DVLOG(1) << "Get response for resource failed: host " << host << " path "
