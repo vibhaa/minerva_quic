@@ -26,6 +26,7 @@
 
 #include "base/macros.h"
 #include "net/quic/core/crypto/quic_decrypter.h"
+#include "net/quic/core/client_data.h"
 #include "net/quic/core/quic_alarm.h"
 #include "net/quic/core/quic_alarm_factory.h"
 #include "net/quic/core/quic_blocked_writer_interface.h"
@@ -733,6 +734,11 @@ class QUIC_EXPORT_PRIVATE QuicConnection
     defer_send_in_response_to_packets_ = defer;
   }
 
+  // Sets client data that is then passed to the congestion control algorithm.
+  void set_auxiliary_client_data(ClientData* cdata){
+      client_data_ = cdata;
+  }
+
  protected:
   // Calls cancel() on all the alarms owned by this connection.
   void CancelAllAlarms();
@@ -1165,6 +1171,9 @@ class QUIC_EXPORT_PRIVATE QuicConnection
   // used to safeguard against an accidental tail recursion in probing
   // retransmission code.
   bool probing_retransmission_pending_;
+
+  // Client data that is passed to the congestion control algorithm. Read-only.
+  ClientData* client_data_;
 
   DISALLOW_COPY_AND_ASSIGN(QuicConnection);
 };

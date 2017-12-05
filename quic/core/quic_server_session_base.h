@@ -15,6 +15,7 @@
 
 #include "base/macros.h"
 #include "net/quic/core/crypto/quic_compressed_certs_cache.h"
+#include "net/quic/core/client_data.h"
 #include "net/quic/core/quic_crypto_server_stream.h"
 #include "net/quic/core/quic_packets.h"
 #include "net/quic/core/quic_spdy_session.h"
@@ -65,6 +66,10 @@ class QUIC_EXPORT_PRIVATE QuicServerSessionBase : public QuicSpdySession {
 
   void set_serving_region(const std::string& serving_region) {
     serving_region_ = serving_region;
+  }
+
+  void set_auxiliary_client_data(ClientData* cdata) {
+      client_data_ = cdata;
   }
 
  protected:
@@ -129,6 +134,9 @@ class QUIC_EXPORT_PRIVATE QuicServerSessionBase : public QuicSpdySession {
   // should go away once we fix http://b//27897982
   int32_t BandwidthToCachedParameterBytesPerSecond(
       const QuicBandwidth& bandwidth);
+
+  // The client data that this session writes when receiving an HTTP request.
+  ClientData* client_data_;
 
   DISALLOW_COPY_AND_ASSIGN(QuicServerSessionBase);
 };

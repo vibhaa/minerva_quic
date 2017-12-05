@@ -275,7 +275,8 @@ QuicConnection::QuicConnection(
       no_stop_waiting_frames_(false),
       consecutive_num_packets_with_no_retransmittable_frames_(0),
       fill_up_link_during_probing_(false),
-      probing_retransmission_pending_(false) {
+      probing_retransmission_pending_(false),
+      client_data_(nullptr) {
   QUIC_DLOG(INFO) << ENDPOINT
                   << "Created connection with connection_id: " << connection_id;
   framer_.set_visitor(this);

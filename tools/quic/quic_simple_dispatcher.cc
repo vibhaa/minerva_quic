@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 #include "net/tools/quic/quic_simple_dispatcher.h"
-
 #include "net/tools/quic/quic_simple_server_session.h"
+#include "net/quic/core/client_data.h"
+
 
 namespace net {
 
@@ -50,16 +51,21 @@ QuicServerSessionBase* QuicSimpleDispatcher::CreateQuicSession(
     QuicConnectionId connection_id,
     const QuicSocketAddress& client_address,
     QuicStringPiece /*alpn*/) {
+  // Create a fresh client data instance.
+  ClientData* cdata = new ClientData();
   // The QuicServerSessionBase takes ownership of |connection| below.
   QuicConnection* connection =
       new QuicConnection(connection_id, client_address, helper(),
                          alarm_factory(), CreatePerConnectionWriter(),
                          /* owns_writer= */ true, Perspective::IS_SERVER,
                          GetSupportedTransportVersions());
+  connection->set_auxiliary_client_data(cdata);
 
   QuicServerSessionBase* session = new QuicSimpleServerSession(
       config(), connection, this, session_helper(), crypto_config(),
       compressed_certs_cache(), response_cache_);
+  session->set_auxiliary_client_data(cdata);
+
   session->Initialize();
   return session;
 }

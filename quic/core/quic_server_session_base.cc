@@ -30,7 +30,8 @@ QuicServerSessionBase::QuicServerSessionBase(
       bandwidth_resumption_enabled_(false),
       bandwidth_estimate_sent_to_client_(QuicBandwidth::Zero()),
       last_scup_time_(QuicTime::Zero()),
-      last_scup_packet_number_(0) {}
+      last_scup_packet_number_(0),
+      client_data_(nullptr) {}
 
 QuicServerSessionBase::~QuicServerSessionBase() {}
 
