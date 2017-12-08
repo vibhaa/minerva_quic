@@ -5,7 +5,7 @@
 #include "net/quic/core/congestion_control/send_algorithm_interface.h"
 
 #include "net/quic/core/congestion_control/bbr_sender.h"
-#include "net/quic/core/congestion_control/tcp_cubic_sender_bytes.h"
+#include "net/quic/core/client_data.h"
 #include "net/quic/core/quic_packets.h"
 #include "net/quic/platform/api/quic_bug_tracker.h"
 #include "net/quic/platform/api/quic_flag_utils.h"
@@ -46,6 +46,10 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
       return new TcpCubicSenderBytes(clock, rtt_stats, true /* use Reno */,
                                      initial_congestion_window,
                                      max_congestion_window, stats);
+    case kPropSS:
+      return new TcpCubicSenderBytes(
+          clock, rtt_stats, true /* use Reno */,
+          initial_congestion_window, max_congestion_window, stats);
   }
   return nullptr;
 }
