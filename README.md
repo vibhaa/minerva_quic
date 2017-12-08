@@ -1,5 +1,12 @@
 run ```./add_cert.sh``` to update your certificates
 
+If you're pulling changes, make sure you copy the updated ninja build file:
+```
+cp net.ninja ../out/Debug/obj/net/
+```
+If there are changes to `net.ninja` and you do not copy it over, you will likely
+get a C++ linker error complaining about undefined symbols when you compile.
+
 to copy over data to serve from the quic server, run the following commands
 ```
 mkdir /tmp/quic-data
