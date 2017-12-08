@@ -1,8 +1,18 @@
 run ```./add_cert.sh``` to update your certificates
 
-www.example3.org has the video files for the quic_server to serve from. Ignore this step if you have made no changes to dash in the other repository.
+If you're pulling changes, make sure you copy the updated ninja build file:
+```
+cp net.ninja ../out/Debug/obj/net/
+```
+If there are changes to `net.ninja` and you do not copy it over, you will likely
+get a C++ linker error complaining about undefined symbols when you compile.
+
+
+`www.example3.org` has the video files for the quic_server to serve from. Ignore this step if you have made no changes to dash in the other repository.
 If you make changes to dash from the other respository, compile dash using 
-`grunt --config Gruntfile.js --force` 
+```
+grunt --config Gruntfile.js --force
+``` 
 copy over the new file from `dash.js/build/temp` and add headers similar to the current`dash.all.min.js` file. 
 
 to copy over data to serve from the quic server, run the following commands
@@ -24,7 +34,7 @@ To run the quic server:
 --key_file=net/tools/quic/certs/out/leaf_cert.pkcs8
 ```
 
-To request a given file ```myindex_fastMPC.html``` via a quic client on a different terminal:
+To request a given file `myindex_fastMPC.html` via a quic client on a different terminal:
 ```
 ./out/Debug/quic_client --host=127.0.0.1 --port=6121 https://www.example3.org/myindex_fastMPC.html
 ```

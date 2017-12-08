@@ -11,6 +11,7 @@
 #include <map>
 
 #include "net/quic/core/crypto/quic_random.h"
+#include "net/quic/core/client_data.h"
 #include "net/quic/core/quic_bandwidth.h"
 #include "net/quic/core/quic_config.h"
 #include "net/quic/core/quic_connection_stats.h"
@@ -40,6 +41,10 @@ class QUIC_EXPORT_PRIVATE SendAlgorithmInterface {
       QuicPacketCount initial_congestion_window);
 
   virtual ~SendAlgorithmInterface() {}
+
+
+  // Most send algorithms will do nothing here.
+  virtual void SetAuxiliaryClientData(ClientData* client_data) = 0;
 
   virtual void SetFromConfig(const QuicConfig& config,
                              Perspective perspective) = 0;

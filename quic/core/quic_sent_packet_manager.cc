@@ -887,6 +887,7 @@ void QuicSentPacketManager::CancelRetransmissionsForStream(
 
 void QuicSentPacketManager::SetSendAlgorithm(
     CongestionControlType congestion_control_type) {
+  DLOG(INFO) << "Setting send algorithm in SentPacketManager as " << congestion_control_type;
   SetSendAlgorithm(SendAlgorithmInterface::Create(
       clock_, &rtt_stats_, &unacked_packets_, congestion_control_type,
       QuicRandom::GetInstance(), stats_, initial_congestion_window_));

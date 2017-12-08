@@ -19,6 +19,7 @@
 #include "net/quic/core/congestion_control/pacing_sender.h"
 #include "net/quic/core/congestion_control/rtt_stats.h"
 #include "net/quic/core/congestion_control/send_algorithm_interface.h"
+#include "net/quic/core/client_data.h"
 #include "net/quic/core/quic_packets.h"
 #include "net/quic/core/quic_pending_retransmission.h"
 #include "net/quic/core/quic_sustained_bandwidth_recorder.h"
@@ -236,6 +237,11 @@ class QUIC_EXPORT_PRIVATE QuicSentPacketManager {
   }
 
   bool handshake_confirmed() const { return handshake_confirmed_; }
+
+  void set_auxiliary_client_data(ClientData* cdata) {
+      DLOG(INFO) << "SentPacketManager setting client data";
+      send_algorithm_->SetAuxiliaryClientData(cdata);
+  }
 
  private:
   friend class test::QuicConnectionPeer;

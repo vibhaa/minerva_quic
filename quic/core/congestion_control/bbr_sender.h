@@ -135,6 +135,8 @@ class QUIC_EXPORT_PRIVATE BbrSender : public SendAlgorithmInterface {
 
   DebugState ExportDebugState() const;
 
+  void SetAuxiliaryClientData(ClientData* cdata) override {}
+
  private:
   typedef WindowedFilter<QuicBandwidth,
                          MaxFilter<QuicBandwidth>,

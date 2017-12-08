@@ -736,7 +736,8 @@ class QUIC_EXPORT_PRIVATE QuicConnection
 
   // Sets client data that is then passed to the congestion control algorithm.
   void set_auxiliary_client_data(ClientData* cdata){
-      client_data_ = cdata;
+      DLOG(INFO) << "QuicConnection setting client data";
+      sent_packet_manager_.set_auxiliary_client_data(cdata);
   }
 
  protected:
@@ -1171,9 +1172,6 @@ class QUIC_EXPORT_PRIVATE QuicConnection
   // used to safeguard against an accidental tail recursion in probing
   // retransmission code.
   bool probing_retransmission_pending_;
-
-  // Client data that is passed to the congestion control algorithm. Read-only.
-  ClientData* client_data_;
 
   DISALLOW_COPY_AND_ASSIGN(QuicConnection);
 };

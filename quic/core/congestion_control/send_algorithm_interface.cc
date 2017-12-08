@@ -5,7 +5,8 @@
 #include "net/quic/core/congestion_control/send_algorithm_interface.h"
 
 #include "net/quic/core/congestion_control/bbr_sender.h"
-#include "net/quic/core/congestion_control/tcp_cubic_sender_bytes.h"
+#include "net/quic/core/congestion_control/prop_ss_tcp_cubic.h"
+#include "net/quic/core/client_data.h"
 #include "net/quic/core/quic_packets.h"
 #include "net/quic/platform/api/quic_bug_tracker.h"
 #include "net/quic/platform/api/quic_flag_utils.h"
@@ -26,12 +27,16 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
     QuicConnectionStats* stats,
     QuicPacketCount initial_congestion_window) {
   QuicPacketCount max_congestion_window = kDefaultMaxCongestionWindowPackets;
+  // Hardcode our choice of congestion control :O
+  congestion_control_type = kPropSS;
   switch (congestion_control_type) {
     case kBBR:
+      DLOG(INFO) << "Congestion control type is BBR";
       return new BbrSender(rtt_stats, unacked_packets,
                            initial_congestion_window, max_congestion_window,
                            random);
     case kPCC:
+      DLOG(INFO) << "Congestion control type is PCC";
       if (FLAGS_quic_reloadable_flag_quic_enable_pcc) {
         return CreatePccSender(clock, rtt_stats, unacked_packets, random, stats,
                                initial_congestion_window,
@@ -39,13 +44,20 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
       }
     // Fall back to CUBIC if PCC is disabled.
     case kCubicBytes:
+      DLOG(INFO) << "Congestion control type is TCP Cubic";
       return new TcpCubicSenderBytes(
           clock, rtt_stats, false /* don't use Reno */,
           initial_congestion_window, max_congestion_window, stats);
     case kRenoBytes:
+      DLOG(INFO) << "Congestion control type is TCP Reno";
       return new TcpCubicSenderBytes(clock, rtt_stats, true /* use Reno */,
                                      initial_congestion_window,
                                      max_congestion_window, stats);
+    case kPropSS:
+      DLOG(INFO) << "Congestion control type is Prop SS";
+      return new PropSSTcpCubic(
+          clock, rtt_stats, true /* use Reno */,
+          initial_congestion_window, max_congestion_window, stats);
   }
   return nullptr;
 }
