@@ -155,14 +155,31 @@ void QuicSimpleServerStream::SendResponse() {
   // response status, send error response. Notice that
   // QuicHttpResponseCache push urls are strictly authority + path only,
   // scheme is not included (see |QuicHttpResponseCache::GetKey()|).
+
+  // extract buffer and screen size from the path
   string path_string = request_headers_[":path"].as_string();
   auto pos = path_string.find('?');
+  auto screen_pos = path_string.find('&');
+  string buffer = "";
+  string screen = "";
   if (pos != string::npos) {
-    string buffer = path_string.substr(pos + 1 + strlen("buffer="));
+    if (screen_pos != string::npos) {
+      buffer = path_string.substr(pos + 1 + strlen("buffer="), screen_pos - (pos + 1 + strlen("buffer=")));
+      screen = path_string.substr(screen_pos + 1 + strlen("screen="));
+    }
+    else {
+      buffer = path_string.substr(pos + 1 + strlen("buffer="));
+    }
     path_string = path_string.substr(0, pos);
   }
-
+  QUIC_DVLOG(0) << "url is " << path_string << "  buffer is" << buffer << "screen size is" << screen;
   string request_url = request_headers_[":authority"].as_string() + path_string;
+
+  // update client data with buffer and screen size
+  if (buffer.length() > 0)
+    spdy_session()->get_client_data()->set_buffer_estimate(stod(buffer));
+  if (screen.length() > 0)
+    spdy_session()->get_client_data()->set_screen_size(stod(screen));
 
   int response_code;
   const SpdyHeaderBlock& response_headers = response->headers();

@@ -13,6 +13,7 @@
 #include "net/quic/core/quic_headers_stream.h"
 #include "net/quic/core/quic_session.h"
 #include "net/quic/core/quic_spdy_stream.h"
+#include "net/quic/core/client_data.h"
 #include "net/quic/platform/api/quic_export.h"
 #include "net/quic/platform/api/quic_string_piece.h"
 #include "net/spdy/core/http2_frame_decoder_adapter.h"
@@ -124,6 +125,14 @@ class QUIC_EXPORT_PRIVATE QuicSpdySession : public QuicSession {
     cur_max_timestamp_ = std::max(timestamp, cur_max_timestamp_);
   }
 
+  void set_auxiliary_client_data(ClientData* cdata) {
+    client_data_ = cdata;
+  }
+
+  ClientData* get_client_data(){
+    return client_data_;
+  }
+
   // Called by |QuicHeadersStream::UpdateEnableServerPush()| with
   // value from SETTINGS_ENABLE_PUSH.
   void set_server_push_enabled(bool enable) { server_push_enabled_ = enable; }
@@ -140,6 +149,9 @@ class QUIC_EXPORT_PRIVATE QuicSpdySession : public QuicSession {
   }
 
  protected:
+  // The client data that this session writes when receiving an HTTP request.
+  ClientData* client_data_;
+
   // Override CreateIncomingDynamicStream() and CreateOutgoingDynamicStream()
   // with QuicSpdyStream return type to make sure that all data streams are
   // QuicSpdyStreams.

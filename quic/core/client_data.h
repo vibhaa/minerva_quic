@@ -16,9 +16,14 @@ class QUIC_EXPORT_PRIVATE ClientData {
   ~ClientData();
 
   double get_rate_estimate();
+  double get_buffer_estimate();
+  void set_buffer_estimate(double current_buffer);
+  void set_screen_size(double ss);
 
  private:
   double rate_estimate_;
+  double buffer_estimate_;
+  double screen_size_;
 };
 
 }  // namespace net

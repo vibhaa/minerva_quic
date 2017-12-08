@@ -262,7 +262,7 @@ class QuicSpdySession::SpdyFramerVisitor
       size_t set_max_uncompressed_header_bytes) {
     header_list_.set_max_header_list_size(set_max_uncompressed_header_bytes);
   }
-
+ 
  private:
   void CloseConnection(const string& details, QuicErrorCode code) {
     if (session_->IsConnected()) {
@@ -285,6 +285,7 @@ QuicSpdySession::QuicSpdySession(QuicConnection* connection,
                                  QuicSession::Visitor* visitor,
                                  const QuicConfig& config)
     : QuicSession(connection, visitor, config),
+      client_data_(nullptr),
       max_inbound_header_list_size_(kDefaultMaxUncompressedHeaderSize),
       server_push_enabled_(true),
       stream_id_(kInvalidStreamId),
