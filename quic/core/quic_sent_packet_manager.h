@@ -239,6 +239,7 @@ class QUIC_EXPORT_PRIVATE QuicSentPacketManager {
   bool handshake_confirmed() const { return handshake_confirmed_; }
 
   void set_auxiliary_client_data(ClientData* cdata) {
+      DLOG(INFO) << "SentPacketManager setting client data";
       send_algorithm_->SetAuxiliaryClientData(cdata);
   }
 

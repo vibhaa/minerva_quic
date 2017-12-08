@@ -4,8 +4,8 @@
 
 // TCP cubic send side congestion algorithm, emulates the behavior of TCP cubic.
 
-#ifndef NET_QUIC_CORE_CONGESTION_CONTROL_TCP_CUBIC_SENDER_BYTES_H_
-#define NET_QUIC_CORE_CONGESTION_CONTROL_TCP_CUBIC_SENDER_BYTES_H_
+#ifndef NET_QUIC_CORE_CONGESTION_CONTROL_PROP_SS_TCP_CUBIC_H_
+#define NET_QUIC_CORE_CONGESTION_CONTROL_PROP_SS_TCP_CUBIC_H_
 
 #include <cstdint>
 
@@ -25,18 +25,20 @@ namespace net {
 class RttStats;
 
 namespace test {
-class TcpCubicSenderBytesPeer;
+class PropSSTcpCubicPeer;
 }  // namespace test
 
-class QUIC_EXPORT_PRIVATE TcpCubicSenderBytes : public TcpCubicSenderBase {
+class QUIC_EXPORT_PRIVATE PropSSTcpCubic : public TcpCubicSenderBase {
  public:
-  TcpCubicSenderBytes(const QuicClock* clock,
+  PropSSTcpCubic(const QuicClock* clock,
                       const RttStats* rtt_stats,
                       bool reno,
                       QuicPacketCount initial_tcp_congestion_window,
                       QuicPacketCount max_congestion_window,
                       QuicConnectionStats* stats);
-  ~TcpCubicSenderBytes() override;
+  ~PropSSTcpCubic() override;
+
+  void SetAuxiliaryClientData(ClientData* client_data) override;
 
   // Start implementation of SendAlgorithmInterface.
   void SetFromConfig(const QuicConfig& config,
@@ -66,10 +68,9 @@ class QUIC_EXPORT_PRIVATE TcpCubicSenderBytes : public TcpCubicSenderBase {
                          QuicByteCount prior_in_flight,
                          QuicTime event_time) override;
   void HandleRetransmissionTimeout() override;
-  void SetAuxiliaryClientData(ClientData* cdata) override {}
 
  private:
-  friend class test::TcpCubicSenderBytesPeer;
+  friend class test::PropSSTcpCubicPeer;
 
   CubicBytes cubic_;
 
@@ -99,9 +100,15 @@ class QUIC_EXPORT_PRIVATE TcpCubicSenderBytes : public TcpCubicSenderBase {
   // The minimum window when exiting slow start with large reduction.
   QuicByteCount min_slow_start_exit_window_;
 
-  DISALLOW_COPY_AND_ASSIGN(TcpCubicSenderBytes);
+  // Client data that holds client state
+  ClientData* client_data_;
+
+  // Current buffer estimate from the client.
+  double cur_buffer_estimate_;
+
+  DISALLOW_COPY_AND_ASSIGN(PropSSTcpCubic);
 };
 
 }  // namespace net
 
-#endif  // NET_QUIC_CORE_CONGESTION_CONTROL_TCP_CUBIC_SENDER_BYTES_H_
+#endif  // NET_QUIC_CORE_CONGESTION_CONTROL_PROP_SS_TCP_CUBIC_H_

@@ -736,6 +736,7 @@ class QUIC_EXPORT_PRIVATE QuicConnection
 
   // Sets client data that is then passed to the congestion control algorithm.
   void set_auxiliary_client_data(ClientData* cdata){
+      DLOG(INFO) << "QuicConnection setting client data";
       sent_packet_manager_.set_auxiliary_client_data(cdata);
   }
 

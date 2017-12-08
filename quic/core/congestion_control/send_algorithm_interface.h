@@ -43,9 +43,8 @@ class QUIC_EXPORT_PRIVATE SendAlgorithmInterface {
   virtual ~SendAlgorithmInterface() {}
 
 
-  void SetAuxiliaryClientData(ClientData* client_data) {
-    // Most send algorithms will do nothing here.
-  }
+  // Most send algorithms will do nothing here.
+  virtual void SetAuxiliaryClientData(ClientData* client_data) = 0;
 
   virtual void SetFromConfig(const QuicConfig& config,
                              Perspective perspective) = 0;
