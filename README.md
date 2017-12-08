@@ -1,9 +1,14 @@
 run ```./add_cert.sh``` to update your certificates
 
+www.example3.org has the video files for the quic_server to serve from. Ignore this step if you have made no changes to dash in the other repository.
+If you make changes to dash from the other respository, compile dash using 
+`grunt --config Gruntfile.js --force` 
+copy over the new file from `dash.js/build/temp` and add headers similar to the current`dash.all.min.js` file. 
+
 to copy over data to serve from the quic server, run the following commands
 ```
 mkdir /tmp/quic-data
-cp -r ~/www.example3.org/ /tmp/quic-data/
+cp -r www.example3.org/ /tmp/quic-data/
 ``` 
 
 If you make any changes to the code, run the following command to recompile:
