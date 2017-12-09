@@ -149,6 +149,9 @@ class QUIC_EXPORT_PRIVATE TcpCubicSenderBase : public SendAlgorithmInterface {
   // When true, use unity pacing instead of PRR.
   bool no_prr_;
 
+  // Clock for time calculations within the congestion algorithm.
+  const QuicClock* clock_;
+
  private:
   DISALLOW_COPY_AND_ASSIGN(TcpCubicSenderBase);
 };

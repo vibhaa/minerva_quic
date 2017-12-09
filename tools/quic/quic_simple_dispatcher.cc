@@ -52,7 +52,7 @@ QuicServerSessionBase* QuicSimpleDispatcher::CreateQuicSession(
     const QuicSocketAddress& client_address,
     QuicStringPiece /*alpn*/) {
   // Create a fresh client data instance.
-  ClientData* cdata = new ClientData();
+  ClientData* cdata = new ClientData(helper()->GetClock());
   // The QuicServerSessionBase takes ownership of |connection| below.
   QuicConnection* connection =
       new QuicConnection(connection_id, client_address, helper(),

@@ -176,8 +176,10 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
   if (client_data_ != nullptr) {
       double est = client_data_->get_buffer_estimate();
       if (est != cur_buffer_estimate_) {
+        int64_t delta = clock_->WallNow().AbsoluteDifference(client_data_->get_last_update_time())
+            .ToMilliseconds();
+        DLOG(INFO) << "Congestion control: segment length estimate is " << 1000*(est - cur_buffer_estimate_) + delta;
         cur_buffer_estimate_ = est;
-        DLOG(INFO) << "Congestion control: buffer is " << est;
       }
   }
   
