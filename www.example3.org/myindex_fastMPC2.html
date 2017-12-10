@@ -14,7 +14,7 @@ X-Original-Url: http://www.example3.org/myindex_fastMPC2.html
         <div>
             <video id="videoPlayer" controls="true"></video>
         </div>
-	<script src="dash.all.min.js"></script>
+	<script src="dashScreenSize.all.min.js"></script>
         <script>
             (function(){
                 var url = "/Manifest.mpd";
@@ -22,6 +22,7 @@ X-Original-Url: http://www.example3.org/myindex_fastMPC2.html
 
                 var abr_algorithms = {0: 'Default', 1: 'Fixed Rate (0)', 2: 'Buffer Based', 3: 'Rate Based', 4: 'MPC', 5: 'Festive', 6: 'Bola'};
                 var abr_id = 4;
+                var screen_size = 2;
 
                 if ( abr_id > 1 && abr_id != 6 ) {
                     player.enablerlABR(true);
@@ -39,6 +40,7 @@ X-Original-Url: http://www.example3.org/myindex_fastMPC2.html
                     player.enableBufferOccupancyABR(true);
                 }
                 player.setAbrAlgorithm(abr_id);
+                player.setScreenSize(screen_size);
 
                 if ( abr_id in abr_algorithms ) {
                     document.title = abr_algorithms[abr_id];
