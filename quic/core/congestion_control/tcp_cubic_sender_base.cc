@@ -37,7 +37,8 @@ TcpCubicSenderBase::TcpCubicSenderBase(const QuicClock* clock,
       min4_mode_(false),
       last_cutback_exited_slowstart_(false),
       slow_start_large_reduction_(false),
-      no_prr_(false) {}
+      no_prr_(false),
+      clock_(clock) {}
 
 TcpCubicSenderBase::~TcpCubicSenderBase() {}
 

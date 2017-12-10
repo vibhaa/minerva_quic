@@ -7,16 +7,19 @@
 #define NET_QUIC_CORE_CLIENT_DATA_H_
 
 #include "base/macros.h"
+#include "net/quic/platform/api/quic_clock.h"
+#include "net/quic/core/quic_time.h"
 
 namespace net {
 
 class QUIC_EXPORT_PRIVATE ClientData {
  public:
-  ClientData();
+  ClientData(const QuicClock* clock);
   ~ClientData();
 
   double get_rate_estimate();
   double get_buffer_estimate();
+  QuicWallTime get_last_update_time();
   void set_buffer_estimate(double current_buffer);
   void set_screen_size(double ss);
 
@@ -24,6 +27,9 @@ class QUIC_EXPORT_PRIVATE ClientData {
   double rate_estimate_;
   double buffer_estimate_;
   double screen_size_;
+  const QuicClock* clock_;
+  QuicWallTime last_update_time_;
+  
 };
 
 }  // namespace net
