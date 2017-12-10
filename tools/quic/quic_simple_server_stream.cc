@@ -162,6 +162,7 @@ void QuicSimpleServerStream::SendResponse() {
   auto screen_pos = path_string.find('&');
   string buffer = "";
   string screen = "";
+  QUIC_DVLOG(0) << "url before is " << path_string;
   if (pos != string::npos) {
     if (screen_pos != string::npos) {
       buffer = path_string.substr(pos + 1 + strlen("buffer="), screen_pos - (pos + 1 + strlen("buffer=")));
