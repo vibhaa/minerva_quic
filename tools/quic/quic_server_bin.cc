@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
       net::AllSupportedTransportVersions(), &response_cache);
 
   int rc = server.CreateUDPSocketAndListen(
-      net::QuicSocketAddress(net::QuicIpAddress::Any6(), FLAGS_port));
+      net::QuicSocketAddress(net::QuicIpAddress::Any4(), FLAGS_port));
   if (rc < 0) {
     return 1;
   }

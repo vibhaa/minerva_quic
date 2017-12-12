@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  net::IPAddress ip = net::IPAddress::IPv6AllZeros();
+  net::IPAddress ip = net::IPAddress::IPv4AllZeros();
 
   net::QuicConfig config;
   net::QuicSimpleServer server(
