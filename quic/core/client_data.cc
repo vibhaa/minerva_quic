@@ -18,8 +18,12 @@ double ClientData::get_rate_estimate() {
     return rate_estimate_;
 }
 
-double ClientData::get_buffer_estimate(){
+double ClientData::get_buffer_estimate() {
 	return buffer_estimate_;
+}
+
+double ClientData::get_screen_size() {
+    return screen_size_;
 }
 
 QuicWallTime ClientData::get_last_update_time() {

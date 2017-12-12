@@ -20,6 +20,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   double get_rate_estimate();
   double get_buffer_estimate();
   QuicWallTime get_last_update_time();
+  double get_screen_size();
   void set_buffer_estimate(double current_buffer);
   void set_screen_size(double ss);
 
