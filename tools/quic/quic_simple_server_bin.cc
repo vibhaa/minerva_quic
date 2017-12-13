@@ -51,6 +51,8 @@ int main(int argc, char* argv[]) {
         "\n"
         "Options:\n"
         "-h, --help                  show this help message and exit\n"
+        "--host=<host>               specify the address of the interface to listen on.\n"
+        "                            If using Mahimahi, this must be set to a non-zero value\n"
         "--port=<port>               specify the port to listen on\n"
         "--quic_response_cache_dir  directory containing response data\n"
         "                            to load\n"
@@ -83,8 +85,17 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  net::IPAddress ip = net::IPAddress::IPv4AllZeros();
+  if (!line->HasSwitch("host_ip")) {
+    LOG(WARNING) << "missing --host_ip, so defaulting to 0.0.0.0. " <<
+        "This will not work with Mahimahi";
+  }
 
+  net::IPAddress ip = net::IPAddress::IPv4AllZeros();
+  if (line->HasSwitch("host_ip") &&
+      !ip.AssignFromIPLiteral(line->GetSwitchValueASCII("host_ip"))) {
+    LOG(ERROR) << "--host_ip is a malformed IP address";
+    return 1;
+  }
   net::QuicConfig config;
   net::QuicSimpleServer server(
       CreateProofSource(line->GetSwitchValuePath("certificate_file"),
