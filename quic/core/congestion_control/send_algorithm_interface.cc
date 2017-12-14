@@ -6,6 +6,7 @@
 
 #include "net/quic/core/congestion_control/bbr_sender.h"
 #include "net/quic/core/congestion_control/prop_ss_tcp_cubic.h"
+#include "net/quic/core/congestion_control/max_prop_risk.h"
 #include "net/quic/core/client_data.h"
 #include "net/quic/core/quic_packets.h"
 #include "net/quic/platform/api/quic_bug_tracker.h"
@@ -56,6 +57,11 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
     case kPropSS:
       DLOG(INFO) << "Congestion control type is Prop SS";
       return new PropSSTcpCubic(
+          clock, rtt_stats, true /* use Reno */,
+          initial_congestion_window, max_congestion_window, stats);
+    case kMaxPropRisk:
+      DLOG(INFO) << "Congestion control type is MaxPropRisk";
+      return new MaxPropRisk(
           clock, rtt_stats, true /* use Reno */,
           initial_congestion_window, max_congestion_window, stats);
   }
