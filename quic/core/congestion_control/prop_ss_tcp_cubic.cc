@@ -131,7 +131,7 @@ void PropSSTcpCubic::OnPacketLost(QuicPacketNumber packet_number,
   if (!no_prr_) {
     prr_.OnPacketLost(prior_in_flight);
   }
-
+  
   // TODO(jri): Separate out all of slow start into a separate class.
   if (slow_start_large_reduction_ && InSlowStart()) {
     DCHECK_LT(kDefaultTCPMSS, congestion_window_);
@@ -176,8 +176,14 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
     double multiplier = 1.0;
     if (client_data_ != nullptr) {
         double ss = client_data_->get_screen_size();
+        // This is how we tell if we got a new chunk request.
+        if (client_data_->get_buffer_estimate() != cur_buffer_estimate_) {
+            DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<
+                BandwidthEstimate().ToDebugValue();
+            cur_buffer_estimate_ = client_data_->get_buffer_estimate();
+        }
         if (ss > 0) {
-            multiplier = ss;
+            multiplier = ss * ss;
         }
     }
   
