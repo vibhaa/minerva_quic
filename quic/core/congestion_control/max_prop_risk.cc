@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "net/quic/core/congestion_control/prop_ss_tcp_cubic.h"
+#include "net/quic/core/congestion_control/max_prop_risk.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -23,7 +23,7 @@ namespace {
 const QuicByteCount kDefaultMinimumCongestionWindow = 2 * kDefaultTCPMSS;
 }  // namespace
 
-PropSSTcpCubic::PropSSTcpCubic(
+MaxPropRisk::MaxPropRisk(
     const QuicClock* clock,
     const RttStats* rtt_stats,
     bool reno,
@@ -45,13 +45,13 @@ PropSSTcpCubic::PropSSTcpCubic(
       client_data_(nullptr),
       cur_buffer_estimate_(-1.0) {}
 
-PropSSTcpCubic::~PropSSTcpCubic() {}
+MaxPropRisk::~MaxPropRisk() {}
 
-void PropSSTcpCubic::SetAuxiliaryClientData(ClientData* cdata) {
+void MaxPropRisk::SetAuxiliaryClientData(ClientData* cdata) {
     client_data_ = cdata;
 }
 
-void PropSSTcpCubic::SetFromConfig(const QuicConfig& config,
+void MaxPropRisk::SetFromConfig(const QuicConfig& config,
                                         Perspective perspective) {
   TcpCubicSenderBase::SetFromConfig(config, perspective);
   if (config.HasReceivedConnectionOptions() &&
@@ -72,7 +72,7 @@ void PropSSTcpCubic::SetFromConfig(const QuicConfig& config,
   }
 }
 
-void PropSSTcpCubic::SetCongestionWindowFromBandwidthAndRtt(
+void MaxPropRisk::SetCongestionWindowFromBandwidthAndRtt(
     QuicBandwidth bandwidth,
     QuicTime::Delta rtt) {
   QuicByteCount new_congestion_window = bandwidth.ToBytesPerPeriod(rtt);
@@ -83,26 +83,26 @@ void PropSSTcpCubic::SetCongestionWindowFromBandwidthAndRtt(
                         kMaxResumptionCongestionWindow * kDefaultTCPMSS));
 }
 
-void PropSSTcpCubic::SetCongestionWindowInPackets(
+void MaxPropRisk::SetCongestionWindowInPackets(
     QuicPacketCount congestion_window) {
   congestion_window_ = congestion_window * kDefaultTCPMSS;
 }
 
-void PropSSTcpCubic::SetMinCongestionWindowInPackets(
+void MaxPropRisk::SetMinCongestionWindowInPackets(
     QuicPacketCount congestion_window) {
   min_congestion_window_ = congestion_window * kDefaultTCPMSS;
 }
 
-void PropSSTcpCubic::SetNumEmulatedConnections(int num_connections) {
+void MaxPropRisk::SetNumEmulatedConnections(int num_connections) {
   TcpCubicSenderBase::SetNumEmulatedConnections(num_connections);
   cubic_.SetNumConnections(num_connections_);
 }
 
-void PropSSTcpCubic::ExitSlowstart() {
+void MaxPropRisk::ExitSlowstart() {
   slowstart_threshold_ = congestion_window_;
 }
 
-void PropSSTcpCubic::OnPacketLost(QuicPacketNumber packet_number,
+void MaxPropRisk::OnPacketLost(QuicPacketNumber packet_number,
                                        QuicByteCount lost_bytes,
                                        QuicByteCount prior_in_flight) {
   // TCP NewReno (RFC6582) says that once a loss occurs, any losses in packets
@@ -158,17 +158,17 @@ void PropSSTcpCubic::OnPacketLost(QuicPacketNumber packet_number,
                 << " slowstart threshold: " << slowstart_threshold_;
 }
 
-QuicByteCount PropSSTcpCubic::GetCongestionWindow() const {
+QuicByteCount MaxPropRisk::GetCongestionWindow() const {
   return congestion_window_;
 }
 
-QuicByteCount PropSSTcpCubic::GetSlowStartThreshold() const {
+QuicByteCount MaxPropRisk::GetSlowStartThreshold() const {
   return slowstart_threshold_;
 }
 
 // Called when we receive an ack. Normal TCP tracks how many packets one ack
 // represents, but quic has a separate ack for each packet.
-void PropSSTcpCubic::MaybeIncreaseCwnd(
+void MaxPropRisk::MaybeIncreaseCwnd(
     QuicPacketNumber acked_packet_number,
     QuicByteCount acked_bytes,
     QuicByteCount prior_in_flight,
@@ -230,13 +230,13 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
   }
 }
 
-void PropSSTcpCubic::HandleRetransmissionTimeout() {
+void MaxPropRisk::HandleRetransmissionTimeout() {
   cubic_.ResetCubicState();
   slowstart_threshold_ = congestion_window_ / 2;
   congestion_window_ = min_congestion_window_;
 }
 
-void PropSSTcpCubic::OnConnectionMigration() {
+void MaxPropRisk::OnConnectionMigration() {
   TcpCubicSenderBase::OnConnectionMigration();
   cubic_.ResetCubicState();
   num_acked_packets_ = 0;
@@ -245,7 +245,7 @@ void PropSSTcpCubic::OnConnectionMigration() {
   slowstart_threshold_ = initial_max_tcp_congestion_window_;
 }
 
-CongestionControlType PropSSTcpCubic::GetCongestionControlType() const {
+CongestionControlType MaxPropRisk::GetCongestionControlType() const {
   return reno_ ? kRenoBytes : kCubicBytes;
 }
 
