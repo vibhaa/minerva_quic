@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdint>
 
+#include "net/quic/core/quic_bandwidth.h"
 #include "net/quic/core/congestion_control/prr_sender.h"
 #include "net/quic/core/congestion_control/rtt_stats.h"
 #include "net/quic/core/crypto/crypto_protocol.h"
@@ -45,6 +46,9 @@ MaxPropRisk::MaxPropRisk(
       client_data_(nullptr),
       past_weight_(-1.0),
       cur_buffer_estimate_(-1.0) {}
+      cur_buffer_estimate_(-1.0),
+      bandwidth_ests_(100, QuicBandwidth::Zero()),
+      bandwidth_ix_(0) {}
 
 MaxPropRisk::~MaxPropRisk() {}
 
@@ -101,6 +105,41 @@ void MaxPropRisk::SetNumEmulatedConnections(int num_connections) {
 
 void MaxPropRisk::ExitSlowstart() {
   slowstart_threshold_ = congestion_window_;
+}
+
+
+QuicBandwidth MaxPropRisk::InstantaneousBandwidth() const {
+  QuicTime::Delta lrtt = rtt_stats_->latest_rtt();
+  if (lrtt < rtt_stats_->smoothed_rtt()) {
+      lrtt = rtt_stats_->smoothed_rtt();
+  }
+  if (lrtt.IsZero()) {
+    // If we haven't measured an rtt, the bandwidth estimate is unknown.
+    return QuicBandwidth::Zero();
+  }
+  return QuicBandwidth::FromBytesAndTimeDelta(GetCongestionWindow(), lrtt);
+}
+
+QuicBandwidth MaxPropRisk::LongTermBandwidthEstimate() const {
+    int64_t sum_kbits_per_sec = 0;
+    int count = 0;
+    double alpha = 0.2;
+    for (int ix = 0; ix < int(bandwidth_ests_.size()); ix++) {
+        int actual_ix = (ix + bandwidth_ix_) % bandwidth_ests_.size();
+        QuicBandwidth b = bandwidth_ests_[actual_ix];
+        if (!b.IsZero()) {
+            if (count == 0) {
+                sum_kbits_per_sec = b.ToKBitsPerSecond();
+            } else {
+                sum_kbits_per_sec = alpha * b.ToKBitsPerSecond() + (1 - alpha) * sum_kbits_per_sec;
+            }
+            count++;
+        }
+    }
+    if (count == 0) {
+        return QuicBandwidth::Zero();
+    }
+    return QuicBandwidth::FromKBitsPerSecond(sum_kbits_per_sec);
 }
 
 void MaxPropRisk::OnPacketLost(QuicPacketNumber packet_number,
@@ -167,6 +206,8 @@ QuicByteCount MaxPropRisk::GetSlowStartThreshold() const {
   return slowstart_threshold_;
 }
 
+
+
 // Called when we receive an ack. Normal TCP tracks how many packets one ack
 // represents, but quic has a separate ack for each packet.
 void MaxPropRisk::MaybeIncreaseCwnd(
@@ -182,9 +223,9 @@ void MaxPropRisk::MaybeIncreaseCwnd(
       client_data_->update_chunk_remainder(acked_bytes);
         // This is how we tell if we got a new chunk request.
       if (client_data_->get_buffer_estimate() != cur_buffer_estimate_) {
-        DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<
-        BandwidthEstimate().ToDebugValue();
-        cur_buffer_estimate_ = client_data_->get_buffer_estimate();
+          DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<
+              LongTermBandwidthEstimate().ToDebugValue();
+          cur_buffer_estimate_ = client_data_->get_buffer_estimate();
       }
 
       // every computation uses bytes and seconds
@@ -229,6 +270,14 @@ void MaxPropRisk::MaybeIncreaseCwnd(
     // than conventional Reno.
     if (num_acked_packets_ * num_connections_ >=
         congestion_window_ / kDefaultTCPMSS) {
+      // Update our list of bandwidth measurements. This if-body is called
+      // once per RTT.
+      DLOG(INFO) << "Current bandwidth_ix_ = " << bandwidth_ix_ << " and rtt " <<
+          rtt_stats_->smoothed_rtt().ToDebugValue() << ", instantaneous " <<
+          rtt_stats_->latest_rtt().ToDebugValue();
+      bandwidth_ests_[bandwidth_ix_] = InstantaneousBandwidth();
+      bandwidth_ix_ = (bandwidth_ix_ + 1) % bandwidth_ests_.size(); 
+      
       congestion_window_ += int(multiplier * kDefaultTCPMSS);
       num_acked_packets_ = 0;
     }

@@ -68,6 +68,12 @@ class QUIC_EXPORT_PRIVATE MaxPropRisk : public TcpCubicSenderBase {
                          QuicByteCount prior_in_flight,
                          QuicTime event_time) override;
   void HandleRetransmissionTimeout() override;
+  
+  // Current bandwidth estimate, based on the last recorded RTT and congestion window.
+  QuicBandwidth InstantaneousBandwidth() const;
+
+  // Provide an estimate of the long-term bandwidth estimate seen by this connection.
+  QuicBandwidth LongTermBandwidthEstimate() const;
 
  private:
   friend class test::MaxPropRiskPeer;
@@ -108,6 +114,13 @@ class QUIC_EXPORT_PRIVATE MaxPropRisk : public TcpCubicSenderBase {
 
   // Current buffer estimate from the client.
   double cur_buffer_estimate_;
+
+  // Estimate of the current average bandwidth. It should be over
+  // timescales appreciably longer than an RTT so that it's not affected by
+  // the TCP sawtooth pattern.
+  std::vector<QuicBandwidth> bandwidth_ests_;
+  // Index into the bandwidth_ests_ vector
+  int bandwidth_ix_;
 
   DISALLOW_COPY_AND_ASSIGN(MaxPropRisk);
 };
