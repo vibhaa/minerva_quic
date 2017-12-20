@@ -2,6 +2,7 @@
 
 #include "net/quic/core/client_data.h"
 #include "net/quic/platform/api/quic_clock.h"
+#include <stdlib.h>
 
 namespace net {
 
@@ -9,6 +10,7 @@ ClientData::ClientData(const QuicClock* clock)
     : rate_estimate_(0.0),
       buffer_estimate_(0.0),
       screen_size_(0.0),
+      client_id_(rand() % 10000 + 1),
       clock_(clock),
       last_update_time_(QuicWallTime::Zero()) {}
 
@@ -24,6 +26,10 @@ double ClientData::get_buffer_estimate() {
 
 double ClientData::get_screen_size() {
     return screen_size_;
+}
+
+double ClientData::get_client_id(){
+  return client_id_;
 }
 
 QuicWallTime ClientData::get_last_update_time() {

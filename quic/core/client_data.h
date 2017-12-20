@@ -23,11 +23,13 @@ class QUIC_EXPORT_PRIVATE ClientData {
   double get_screen_size();
   void set_buffer_estimate(double current_buffer);
   void set_screen_size(double ss);
+  double get_client_id();
 
  private:
   double rate_estimate_;
   double buffer_estimate_;
   double screen_size_;
+  double client_id_;
   const QuicClock* clock_;
   QuicWallTime last_update_time_;
   

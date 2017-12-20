@@ -6,6 +6,9 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <fstream>
+#include <iostream>
+#include <iomanip>
 
 #include "net/quic/core/congestion_control/prr_sender.h"
 #include "net/quic/core/congestion_control/rtt_stats.h"
@@ -173,6 +176,9 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
     QuicByteCount acked_bytes,
     QuicByteCount prior_in_flight,
     QuicTime event_time) {
+
+    std::ofstream bw_log_file;
+    bw_log_file.open("quic_bw.log", std::ios::app);
   
     double multiplier = 1.0;
     if (client_data_ != nullptr) {
@@ -181,12 +187,21 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
         if (client_data_->get_buffer_estimate() != cur_buffer_estimate_) {
             DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<
                 BandwidthEstimate().ToDebugValue();
+            if (ss > 0) {
+              bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
+                       << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
+                       << ", \"clientId\": " << client_data_->get_client_id()
+                       << ", \"bandwidth_Mbps\": " << BandwidthEstimate().ToKBitsPerSecond()/1000.0
+                       << ", \"screen_size\": " << ss
+                       << "}\n";
+            }
             cur_buffer_estimate_ = client_data_->get_buffer_estimate();
         }
         if (ss > 0) {
             multiplier = ss * ss;
         }
     }
+    bw_log_file.close();
   
   QUIC_BUG_IF(InRecovery()) << "Never increase the CWND during recovery.";
   // Do not increase the congestion window unless the sender is close to using
