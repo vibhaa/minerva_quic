@@ -7,17 +7,26 @@
 namespace net {
 
 ClientData::ClientData(const QuicClock* clock)
-    : rate_estimate_(0.0),
-      buffer_estimate_(0.0),
+    : buffer_estimate_(0.0),
       screen_size_(0.0),
       client_id_(rand() % 10000 + 1),
       clock_(clock),
+      total_throughput_(0),
+      total_time_(QuicTime::Delta::Zero()),
       last_update_time_(QuicWallTime::Zero()) {}
 
 ClientData::~ClientData() {}
 
-double ClientData::get_rate_estimate() {
-    return rate_estimate_;
+QuicBandwidth ClientData::get_rate_estimate() {
+  return QuicBandwidth::FromBytesAndTimeDelta(total_throughput_, total_time_);
+}
+
+  void ClientData:: update_rtt(QuicTime::Delta rtt){
+  total_time_ = total_time_ + rtt;
+}
+
+void ClientData::update_throughput(QuicByteCount x){
+    total_throughput_ += x;
 }
 
 double ClientData::get_buffer_estimate() {

@@ -188,10 +188,12 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
             DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<
                 BandwidthEstimate().ToDebugValue();
             if (ss > 0) {
+	      client_data_->update_rtt(rtt_stats_->latest_rtt());
+	      client_data_->update_throughput(congestion_window_); 
               bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
                        << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
                        << ", \"clientId\": " << client_data_->get_client_id()
-                       << ", \"bandwidth_Mbps\": " << BandwidthEstimate().ToKBitsPerSecond()/1000.0
+			  << ", \"bandwidth_Mbps\": " << client_data_->get_rate_estimate().ToKBitsPerSecond()/1000.0
                        << ", \"screen_size\": " << ss
                        << "}\n";
             }
@@ -239,7 +241,7 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
     congestion_window_ = std::min(
         max_congestion_window_,
         cubic_.CongestionWindowAfterAck(acked_bytes, congestion_window_,
-                                        rtt_stats_->min_rtt(), event_time));
+                                         rtt_stats_->min_rtt(), event_time));
     QUIC_DVLOG(1) << "Cubic; congestion window: " << congestion_window_
                   << " slowstart threshold: " << slowstart_threshold_;
   }
