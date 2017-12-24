@@ -23,7 +23,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   double get_buffer_estimate();
   QuicWallTime get_last_update_time();
   double get_screen_size();
-  void update_rtt(QuicTime::Delta rtt);
+  //void update_rtt(QuicTime::Delta rtt);
   void update_throughput(QuicByteCount throughput);
   void set_buffer_estimate(double current_buffer);
   void set_screen_size(double ss);
@@ -36,7 +36,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   double client_id_;
   const QuicClock* clock_;
   QuicByteCount total_throughput_;
-  QuicTime::Delta total_time_;
+  QuicWallTime initial_time_;
   QuicWallTime last_update_time_;
 };
 

@@ -182,14 +182,13 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
   
     double multiplier = 1.0;
     if (client_data_ != nullptr) {
+        client_data_->update_throughput(acked_bytes);
         double ss = client_data_->get_screen_size();
         // This is how we tell if we got a new chunk request.
         if (client_data_->get_buffer_estimate() != cur_buffer_estimate_) {
             DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<
                 BandwidthEstimate().ToDebugValue();
-            if (ss > 0) {
-	      client_data_->update_rtt(rtt_stats_->latest_rtt());
-	      client_data_->update_throughput(congestion_window_); 
+            if (ss > 0) { 
               bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
                        << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
                        << ", \"clientId\": " << client_data_->get_client_id()
@@ -202,6 +201,9 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
         if (ss > 0) {
             multiplier = ss * ss;
         }
+    }
+    else {
+      DLOG(INFO) << "ack without client data";
     }
     bw_log_file.close();
   

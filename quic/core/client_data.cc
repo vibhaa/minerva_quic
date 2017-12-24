@@ -2,6 +2,7 @@
 
 #include "net/quic/core/client_data.h"
 #include "net/quic/platform/api/quic_clock.h"
+#include "net/quic/platform/api/quic_logging.h"
 #include <stdlib.h>
 
 namespace net {
@@ -12,17 +13,15 @@ ClientData::ClientData(const QuicClock* clock)
       client_id_(rand() % 10000 + 1),
       clock_(clock),
       total_throughput_(0),
-      total_time_(QuicTime::Delta::Zero()),
+      initial_time_(clock->WallNow()),
       last_update_time_(QuicWallTime::Zero()) {}
 
 ClientData::~ClientData() {}
 
 QuicBandwidth ClientData::get_rate_estimate() {
-  return QuicBandwidth::FromBytesAndTimeDelta(total_throughput_, total_time_);
-}
-
-  void ClientData:: update_rtt(QuicTime::Delta rtt){
-  total_time_ = total_time_ + rtt;
+  QuicTime::Delta total_time = clock_->WallNow().AbsoluteDifference(initial_time_);
+  DLOG(INFO) << "total time" << total_time.ToSeconds();
+  return QuicBandwidth::FromBytesAndTimeDelta(total_throughput_, total_time);
 }
 
 void ClientData::update_throughput(QuicByteCount x){
