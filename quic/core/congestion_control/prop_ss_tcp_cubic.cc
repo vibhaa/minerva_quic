@@ -46,7 +46,6 @@ PropSSTcpCubic::PropSSTcpCubic(
                                          kDefaultTCPMSS),
       min_slow_start_exit_window_(min_congestion_window_),
       client_data_(nullptr),
-      sampler_(new BandwidthSampler()),
       cur_buffer_estimate_(-1.0) {}
 
 PropSSTcpCubic::~PropSSTcpCubic() {}
@@ -180,8 +179,6 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
 
     std::ofstream bw_log_file;
     bw_log_file.open("quic_bw.log", std::ios::app);
-    BandwidthSample bandwidth_sample =
-      sampler_->OnPacketAcknowledged(event_time, acked_packet_number);
     DLOG(INFO) << "outside packet_number:" << acked_packet_number << " bytes are:" << acked_bytes;
     double multiplier = 1.0;
     if (client_data_ != nullptr) {
@@ -196,8 +193,7 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
               bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
                        << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
                        << ", \"clientId\": " << client_data_->get_client_id()
-		// << ", \"bandwidth_Mbps\": " << client_data_->get_rate_estimate().ToKBitsPerSecond()/1000.0
-		       << ", \"bandwidth_Mbps\": " << bandwidth_sample.bandwidth.ToKBitsPerSecond()/1000.0
+		       << ", \"bandwidth_Mbps\": " << client_data_->get_rate_estimate().ToKBitsPerSecond()/1000.0
 		       << ", \"screen_size\": " << ss
                        << "}\n";
             }

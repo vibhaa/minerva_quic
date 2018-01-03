@@ -10,7 +10,6 @@
 #include <cstdint>
 
 #include "base/macros.h"
-#include "net/quic/core/congestion_control/bandwidth_sampler.h"
 #include "net/quic/core/congestion_control/cubic_bytes.h"
 #include "net/quic/core/congestion_control/hybrid_slow_start.h"
 #include "net/quic/core/congestion_control/prr_sender.h"
@@ -103,11 +102,6 @@ class QUIC_EXPORT_PRIVATE PropSSTcpCubic : public TcpCubicSenderBase {
 
   // Client data that holds client state
   ClientData* client_data_;
-
-  // bandwidth sampler object
-  // Bandwidth sampler provides BBR with the bandwidth measurements at
-  // individual points.
-  std::unique_ptr<BandwidthSamplerInterface> sampler_;
   
   // Current buffer estimate from the client.
   double cur_buffer_estimate_;
