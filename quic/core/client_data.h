@@ -36,6 +36,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   double client_id_;
   const QuicClock* clock_;
   QuicByteCount total_throughput_;
+  QuicBandwidth last_bw_;
   QuicWallTime initial_time_;
   QuicWallTime last_update_time_;
 };

@@ -13,19 +13,27 @@ ClientData::ClientData(const QuicClock* clock)
       client_id_(rand() % 10000 + 1),
       clock_(clock),
       total_throughput_(0),
+      last_bw_(QuicBandwidth::Zero()),
       initial_time_(clock->WallNow()),
       last_update_time_(QuicWallTime::Zero()) {}
 
 ClientData::~ClientData() {}
 
 QuicBandwidth ClientData::get_rate_estimate() {
-  QuicTime::Delta total_time = clock_->WallNow().AbsoluteDifference(initial_time_);
-  DLOG(INFO) << "total time" << total_time.ToSeconds();
-  return QuicBandwidth::FromBytesAndTimeDelta(total_throughput_, total_time);
+  //QuicTime::Delta total_time = clock_->WallNow().AbsoluteDifference(initial_time_);
+  //DLOG(INFO) << "total time" << total_time.ToSeconds();
+  //return QuicBandwidth::FromBytesAndTimeDelta(total_throughput_, total_time);
+  return last_bw_;
 }
 
-void ClientData::update_throughput(QuicByteCount x){
-    total_throughput_ += x;
+void ClientData::update_throughput(QuicByteCount x) {
+  QuicTime::Delta diff = clock_->WallNow().AbsoluteDifference(initial_time_);
+  if (diff.ToMilliseconds() > 5000) {
+    last_bw_ = QuicBandwidth::FromBytesAndTimeDelta(total_throughput_, diff);
+    total_throughput_ = 0;
+    initial_time_ = clock_->WallNow();
+  }
+  total_throughput_ += x;
 }
 
 double ClientData::get_buffer_estimate() {
