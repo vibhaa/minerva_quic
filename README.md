@@ -60,7 +60,7 @@ python run_video.py privateip fastMPC 10 2 blah 5
 ``` 
 which runs the video for 10 seconds
 
-To get logs for a number of network traces, by running the quic server and a chrome client on different sides of a mahimahi link (not yet tested):
+To get logs for a number of network traces, by running the quic server and a chrome client on different sides of a mahimahi link:
 ```
 python run_traces.py ../cooked_traces/ fastMPC 2 privateip
 ```
