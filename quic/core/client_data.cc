@@ -28,12 +28,16 @@ QuicBandwidth ClientData::get_rate_estimate() {
 
 void ClientData::update_throughput(QuicByteCount x) {
   QuicTime::Delta diff = clock_->WallNow().AbsoluteDifference(initial_time_);
-  if (diff.ToMilliseconds() > 5000) {
-    last_bw_ = QuicBandwidth::FromBytesAndTimeDelta(total_throughput_, diff);
-    total_throughput_ = 0;
-    initial_time_ = clock_->WallNow();
-  }
+  //if (diff.ToMilliseconds() > 5000) {
+  last_bw_ = QuicBandwidth::FromBytesAndTimeDelta(total_throughput_, diff);
+  //  total_throughput_ = 0;
+ //   initial_time_ = clock_->WallNow();
+  //}
   total_throughput_ += x;
+}
+
+QuicByteCount ClientData::get_throughput() {
+    return total_throughput_;
 }
 
 double ClientData::get_buffer_estimate() {

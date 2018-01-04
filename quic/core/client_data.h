@@ -25,6 +25,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   double get_screen_size();
   //void update_rtt(QuicTime::Delta rtt);
   void update_throughput(QuicByteCount throughput);
+  QuicByteCount get_throughput();
   void set_buffer_estimate(double current_buffer);
   void set_screen_size(double ss);
   double get_client_id();

@@ -182,8 +182,10 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
     DLOG(INFO) << "outside packet_number:" << acked_packet_number << " bytes are:" << acked_bytes;
     double multiplier = 1.0;
     if (client_data_ != nullptr) {
-        client_data_->update_throughput(2*acked_bytes);
-        DLOG(INFO) << "inside packet_number:" << acked_packet_number << " bytes are:" << acked_bytes;
+      if (acked_packet_number > 4) {
+        client_data_->update_throughput(acked_bytes);
+        DLOG(INFO) << "inside packet_number:" << acked_packet_number << "total bytes are:" << client_data_->get_throughput();
+      }
 	double ss = client_data_->get_screen_size();
         // This is how we tell if we got a new chunk request.
         if (client_data_->get_buffer_estimate() != cur_buffer_estimate_) {
@@ -194,6 +196,7 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
                        << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
                        << ", \"clientId\": " << client_data_->get_client_id()
 		       << ", \"bandwidth_Mbps\": " << client_data_->get_rate_estimate().ToKBitsPerSecond()/1000.0
+		       << ", \"total throughput\": "<< client_data_->get_throughput()
 		       << ", \"screen_size\": " << ss
                        << "}\n";
             }
