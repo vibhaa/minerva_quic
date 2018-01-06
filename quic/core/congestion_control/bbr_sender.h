@@ -90,7 +90,7 @@ class QUIC_EXPORT_PRIVATE BbrSender : public SendAlgorithmInterface {
     QuicPacketNumber end_of_app_limited_phase;
   };
 
-  BbrSender(const RttStats* rtt_stats,
+  BbrSender(const QuicClock* clock, const RttStats* rtt_stats,
             const QuicUnackedPacketMap* unacked_packets,
             QuicPacketCount initial_tcp_congestion_window,
             QuicPacketCount max_tcp_congestion_window,
@@ -135,7 +135,7 @@ class QUIC_EXPORT_PRIVATE BbrSender : public SendAlgorithmInterface {
 
   DebugState ExportDebugState() const;
 
-  void SetAuxiliaryClientData(ClientData* cdata) override {}
+  void SetAuxiliaryClientData(ClientData* cdata) override;
 
  private:
   typedef WindowedFilter<QuicBandwidth,
@@ -223,6 +223,7 @@ class QUIC_EXPORT_PRIVATE BbrSender : public SendAlgorithmInterface {
 
   Mode mode_;
 
+  const QuicClock* clock_;
   // Bandwidth sampler provides BBR with the bandwidth measurements at
   // individual points.
   std::unique_ptr<BandwidthSamplerInterface> sampler_;
@@ -351,6 +352,7 @@ class QUIC_EXPORT_PRIVATE BbrSender : public SendAlgorithmInterface {
   // app limited.
   bool probe_rtt_disabled_if_app_limited_;
   bool app_limited_since_last_probe_rtt_;
+  ClientData* client_data_;
   QuicTime::Delta min_rtt_since_last_probe_rtt_;
 
   DISALLOW_COPY_AND_ASSIGN(BbrSender);

@@ -15,10 +15,25 @@ ClientData::ClientData(const QuicClock* clock)
       total_throughput_(0),
       last_bw_(QuicBandwidth::Zero()),
       initial_time_(clock->WallNow()),
+      total_rtt_(QuicTime::Delta::Zero()),
+      chunk_remainder_(0),
       last_update_time_(QuicWallTime::Zero()) {}
 
 ClientData::~ClientData() {}
 
+void ClientData::reset_chunk_remainder() {
+    chunk_remainder_ = 0;
+}
+
+void ClientData:: update_chunk_remainder(QuicByteCount x) {
+    chunk_remainder_ -= x;
+    chunk_remainder_ = fmin(0, chunk_remainder_);
+}
+
+QuicByteCount ClientData::get_chunk_remainder() {
+    return chunk_remainder_;
+}
+  
 QuicBandwidth ClientData::get_rate_estimate() {
   //QuicTime::Delta total_time = clock_->WallNow().AbsoluteDifference(initial_time_);
   //DLOG(INFO) << "total time" << total_time.ToSeconds();
@@ -26,12 +41,16 @@ QuicBandwidth ClientData::get_rate_estimate() {
   return last_bw_;
 }
 
+void ClientData::update_rtt(QuicTime::Delta rtt){
+  total_rtt_ = total_rtt_ + rtt;
+}
+
 void ClientData::update_throughput(QuicByteCount x) {
   QuicTime::Delta diff = clock_->WallNow().AbsoluteDifference(initial_time_);
   if (diff.ToMilliseconds() > 5000) {
       last_bw_ = QuicBandwidth::FromBytesAndTimeDelta(total_throughput_, diff);
-      total_throughput_ = 0;
-      initial_time_ = clock_->WallNow();
+      //total_throughput_ = 0;
+      //initial_time_ = clock_->WallNow();
   }
   /*if (total_throughput_ == 0){
     initial_time_ = clock_->WallNow();
@@ -43,8 +62,18 @@ QuicByteCount ClientData::get_throughput() {
     return total_throughput_;
 }
 
+QuicTime::Delta ClientData::get_time_elapsed(){
+    QuicTime::Delta total_time = clock_->WallNow().AbsoluteDifference(initial_time_);
+    return total_time;
+}
+  
+QuicTime::Delta ClientData::get_total_rtt() {
+    return total_rtt_;
+}
+
 double ClientData::get_buffer_estimate() {
-	return buffer_estimate_;
+  return buffer_estimate_ -
+    clock_->WallNow().AbsoluteDifference(last_update_time_).ToSeconds();
 }
 
 double ClientData::get_screen_size() {

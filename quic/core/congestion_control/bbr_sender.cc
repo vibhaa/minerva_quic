@@ -6,6 +6,10 @@
 
 #include <algorithm>
 #include <sstream>
+#include <cstdint>
+#include <fstream>
+#include <iostream>
+#include <iomanip>
 
 #include "net/quic/core/congestion_control/rtt_stats.h"
 #include "net/quic/core/crypto/crypto_protocol.h"
@@ -75,7 +79,7 @@ BbrSender::DebugState::DebugState(const BbrSender& sender)
 
 BbrSender::DebugState::DebugState(const DebugState& state) = default;
 
-BbrSender::BbrSender(const RttStats* rtt_stats,
+  BbrSender::BbrSender(const QuicClock* clock, const RttStats* rtt_stats,
                      const QuicUnackedPacketMap* unacked_packets,
                      QuicPacketCount initial_tcp_congestion_window,
                      QuicPacketCount max_tcp_congestion_window,
@@ -84,6 +88,7 @@ BbrSender::BbrSender(const RttStats* rtt_stats,
       unacked_packets_(unacked_packets),
       random_(random),
       mode_(STARTUP),
+      clock_(clock),
       sampler_(new BandwidthSampler()),
       round_trip_count_(0),
       last_sent_packet_(0),
@@ -130,11 +135,16 @@ BbrSender::BbrSender(const RttStats* rtt_stats,
       probe_rtt_skipped_if_similar_rtt_(false),
       probe_rtt_disabled_if_app_limited_(false),
       app_limited_since_last_probe_rtt_(false),
+      client_data_(nullptr),
       min_rtt_since_last_probe_rtt_(QuicTime::Delta::Infinite()) {
   EnterStartupMode();
 }
 
 BbrSender::~BbrSender() {}
+
+void BbrSender::SetAuxiliaryClientData(ClientData* cdata) {
+    client_data_ = cdata;
+}
 
 bool BbrSender::InSlowStart() const {
   return mode_ == STARTUP;
@@ -147,6 +157,19 @@ void BbrSender::OnPacketSent(QuicTime sent_time,
                              HasRetransmittableData is_retransmittable) {
   last_sent_packet_ = packet_number;
 
+  std::ofstream bw_log_file;
+  bw_log_file.open("quic_bw.log", std::ios::app);
+  double ss = client_data_->get_screen_size();
+  if (ss > 0) {
+    bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3)
+		<< clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
+		<< ", \"clientId\": " << client_data_->get_client_id()
+		<< ", \"bandwidth_Mbps\": " << BandwidthEstimate().ToKBitsPerSecond()/1000.0
+		<< ", \"screen_size\": " << ss
+		<< "}\n";
+  }
+  bw_log_file.close();
+  
   if (bytes_in_flight == 0 && sampler_->is_app_limited()) {
     exiting_quiescence_ = true;
   }

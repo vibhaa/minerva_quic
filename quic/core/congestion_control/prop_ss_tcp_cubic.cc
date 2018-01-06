@@ -184,7 +184,8 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
     if (client_data_ != nullptr) {
       if (acked_packet_number > 4) {
         client_data_->update_throughput(acked_bytes);
-        DLOG(INFO) << "inside packet_number:" << acked_packet_number << "total bytes are:" << client_data_->get_throughput();
+	client_data_->update_rtt(rtt_stats_->smoothed_rtt());
+        DLOG(INFO) << "inside packet_number:" << acked_packet_number << "total bytes are:" << client_data_->get_throughput() << "total time elapsed is:" << client_data_->get_time_elapsed() << "sum smoothed rtts is: " << client_data_->get_total_rtt();
       }
 	double ss = client_data_->get_screen_size();
         // This is how we tell if we got a new chunk request.

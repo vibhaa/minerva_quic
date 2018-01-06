@@ -177,14 +177,24 @@ void MaxPropRisk::MaybeIncreaseCwnd(
     double multiplier = 1.0;
     if (client_data_ != nullptr) {
         double ss = client_data_->get_screen_size();
+	client_data_->update_chunk_remainder(acked_bytes);
         // This is how we tell if we got a new chunk request.
         if (client_data_->get_buffer_estimate() != cur_buffer_estimate_) {
             DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<
                 BandwidthEstimate().ToDebugValue();
             cur_buffer_estimate_ = client_data_->get_buffer_estimate();
+	    client_data_->reset_chunk_remainder();
         }
-        if (ss > 0) {
-            multiplier = ss * ss;
+	
+	double risk_rate = client_data_->get_chunk_remainder() / client_data_->get_buffer_estimate(); // TODO: prevent o division error
+	double risk = risk_rate * rtt_stats_->latest_rtt().ToSeconds() / kDefaultTCPMSS / congestion_window_;
+        if (ss > 0 || risk > 0) {
+	  //TODO: fix
+	if (ss > risk) {
+	    multiplier = ss * ss;
+	  } else {
+	    multiplier = risk * risk;
+	  }
         }
     }
   
