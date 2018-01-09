@@ -198,6 +198,13 @@ void QuicSimpleServerStream::SendResponse() {
     return;
   }
 
+  if (request_url.find(".m4s") != string::npos) {
+    uint64_t chunk_len = 0;
+    QuicTextUtils::StringToUint64(response_headers.find("content-length")->second, &chunk_len);
+    QUIC_DVLOG(0) << "chunk length is" << chunk_len;
+    spdy_session()->get_client_data()->reset_chunk_remainder(chunk_len);
+  }
+
   if (id() % 2 == 0) {
     // A server initiated stream is only used for a server push response,
     // and only 200 and 30X response codes are supported for server push.

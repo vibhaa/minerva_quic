@@ -185,12 +185,18 @@ void MaxPropRisk::MaybeIncreaseCwnd(
         DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<
         BandwidthEstimate().ToDebugValue();
         cur_buffer_estimate_ = client_data_->get_buffer_estimate();
-        client_data_->reset_chunk_remainder();
       }
 
+      // every computation uses bytes and seconds
       double risk_rate = client_data_->get_chunk_remainder() / client_data_->get_buffer_estimate(); // TODO: prevent o division error
-  	  double risk_window = risk_rate * rtt_stats_->latest_rtt().ToSeconds() / kDefaultTCPMSS;
-      double risk_weight = past_weight_ * risk_window / congestion_window_;
+  	  double risk_window = risk_rate * rtt_stats_->latest_rtt().ToMilliseconds() / 1000.0;
+      double risk_weight = past_weight_ * risk_window / congestion_window_; //cwnd is in bytes
+      if (ss > 0){
+        DLOG(INFO) << "chunk remainder is " << client_data_->get_chunk_remainder() << "buffer is " << client_data_->get_buffer_estimate();
+        DLOG(INFO) << "rtt is in ms " << rtt_stats_->latest_rtt().ToMilliseconds() << "last window is" << congestion_window_;
+        DLOG(INFO) << "risk rate is " << risk_rate << " risk window is " << risk_window;
+        DLOG(INFO) << "risk weight is " << risk_weight << "screen size is " << ss;
+      }
       if (ss > 0 || risk_weight > 0) {
         weight = std::max(ss, risk_weight);
       }

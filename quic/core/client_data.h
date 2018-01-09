@@ -19,7 +19,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   ClientData(const QuicClock* clock);
   ~ClientData();
 
-  void reset_chunk_remainder();
+  void reset_chunk_remainder(QuicByteCount x);
   void update_chunk_remainder(QuicByteCount x);
   QuicByteCount get_chunk_remainder();
   QuicBandwidth get_rate_estimate();

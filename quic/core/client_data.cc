@@ -21,13 +21,13 @@ ClientData::ClientData(const QuicClock* clock)
 
 ClientData::~ClientData() {}
 
-void ClientData::reset_chunk_remainder() {
-    chunk_remainder_ = 0;
+void ClientData::reset_chunk_remainder(QuicByteCount x) {
+    chunk_remainder_ = x;
 }
 
 void ClientData:: update_chunk_remainder(QuicByteCount x) {
     chunk_remainder_ -= x;
-    chunk_remainder_ = fmin(0, chunk_remainder_);
+    chunk_remainder_ = fmax(0, chunk_remainder_);
 }
 
 QuicByteCount ClientData::get_chunk_remainder() {
