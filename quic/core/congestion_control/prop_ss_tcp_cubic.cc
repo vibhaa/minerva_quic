@@ -270,7 +270,7 @@ void PropSSTcpCubic::OnConnectionMigration() {
 }
 
 CongestionControlType PropSSTcpCubic::GetCongestionControlType() const {
-  return reno_ ? kRenoBytes : kCubicBytes;
+  return kPropSS;
 }
 
 }  // namespace net

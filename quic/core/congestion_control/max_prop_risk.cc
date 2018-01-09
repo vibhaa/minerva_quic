@@ -43,6 +43,7 @@ MaxPropRisk::MaxPropRisk(
                                          kDefaultTCPMSS),
       min_slow_start_exit_window_(min_congestion_window_),
       client_data_(nullptr),
+      past_weight_(-1.0),
       cur_buffer_estimate_(-1.0) {}
 
 MaxPropRisk::~MaxPropRisk() {}
@@ -175,29 +176,28 @@ void MaxPropRisk::MaybeIncreaseCwnd(
     QuicTime event_time) {
   
     double multiplier = 1.0;
+    double weight = 1.0;
     if (client_data_ != nullptr) {
-        double ss = client_data_->get_screen_size();
-	client_data_->update_chunk_remainder(acked_bytes);
+      double ss = client_data_->get_screen_size();
+      client_data_->update_chunk_remainder(acked_bytes);
         // This is how we tell if we got a new chunk request.
-        if (client_data_->get_buffer_estimate() != cur_buffer_estimate_) {
-            DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<
-                BandwidthEstimate().ToDebugValue();
-            cur_buffer_estimate_ = client_data_->get_buffer_estimate();
-	    client_data_->reset_chunk_remainder();
-        }
-	
-	double risk_rate = client_data_->get_chunk_remainder() / client_data_->get_buffer_estimate(); // TODO: prevent o division error
-	double risk = risk_rate * rtt_stats_->latest_rtt().ToSeconds() / kDefaultTCPMSS / congestion_window_;
-        if (ss > 0 || risk > 0) {
-	  //TODO: fix
-	if (ss > risk) {
-	    multiplier = ss * ss;
-	  } else {
-	    multiplier = risk * risk;
-	  }
-        }
+      if (client_data_->get_buffer_estimate() != cur_buffer_estimate_) {
+        DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<
+        BandwidthEstimate().ToDebugValue();
+        cur_buffer_estimate_ = client_data_->get_buffer_estimate();
+        client_data_->reset_chunk_remainder();
+      }
+
+      double risk_rate = client_data_->get_chunk_remainder() / client_data_->get_buffer_estimate(); // TODO: prevent o division error
+  	  double risk_window = risk_rate * rtt_stats_->latest_rtt().ToSeconds() / kDefaultTCPMSS;
+      double risk_weight = past_weight_ * risk_window / congestion_window_;
+      if (ss > 0 || risk_weight > 0) {
+        weight = std::max(ss, risk_weight);
+      }
+      multiplier = weight * weight;
+      past_weight_ = weight;
     }
-  
+
   QUIC_BUG_IF(InRecovery()) << "Never increase the CWND during recovery.";
   // Do not increase the congestion window unless the sender is close to using
   // the current window.
@@ -256,7 +256,7 @@ void MaxPropRisk::OnConnectionMigration() {
 }
 
 CongestionControlType MaxPropRisk::GetCongestionControlType() const {
-  return reno_ ? kRenoBytes : kCubicBytes;
+  return kMaxPropRisk;
 }
 
 }  // namespace net

@@ -103,6 +103,9 @@ class QUIC_EXPORT_PRIVATE MaxPropRisk : public TcpCubicSenderBase {
   // Client data that holds client state
   ClientData* client_data_;
 
+  // last weight used for decentralized max prop and risk
+  double past_weight_;
+
   // Current buffer estimate from the client.
   double cur_buffer_estimate_;
 
