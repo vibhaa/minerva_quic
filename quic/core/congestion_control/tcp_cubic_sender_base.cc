@@ -19,7 +19,7 @@ namespace {
 // The minimum cwnd based on RFC 3782 (TCP NewReno) for cwnd reductions on a
 // fast retransmission.  The cwnd after a timeout is still 1.
 const QuicByteCount kMaxBurstBytes = 3 * kDefaultTCPMSS;
-const float kRenoBeta = 0.7f;               // Reno backoff factor.
+const float kRenoBeta = 0.5f;               // Reno backoff factor.
 const uint32_t kDefaultNumConnections = 2;  // N-connection emulation.
 }  // namespace
 
