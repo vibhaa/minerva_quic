@@ -149,7 +149,6 @@ void PropSSTcpCubic::OnPacketLost(QuicPacketNumber packet_number,
           beta = beta * num_connections_ - 0.5 + (3.0 * ss - 1)/(3.0 * ss + 1);
           beta = beta / num_connections_;
       }*/
-      DLOG(INFO) << "Reno beta adjusted: " << beta;
       congestion_window_ = congestion_window_ * beta;
   } else {
     congestion_window_ =
@@ -185,15 +184,19 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
 
     std::ofstream bw_log_file;
     bw_log_file.open("quic_bw.log", std::ios::app);
-    DLOG(INFO) << "outside packet_number:" << acked_packet_number << " bytes are:" << acked_bytes;
     double multiplier = 1.0;
     if (client_data_ != nullptr) {
-      if (acked_packet_number > 4) {
-        client_data_->update_throughput(acked_bytes);
-	client_data_->update_rtt(rtt_stats_->smoothed_rtt());
-        DLOG(INFO) << "inside packet_number:" << acked_packet_number << "total bytes are:" << client_data_->get_throughput() << "total time elapsed is:" << client_data_->get_time_elapsed() << "sum smoothed rtts is: " << client_data_->get_total_rtt();
-      }
-	double ss = client_data_->get_screen_size();
+        if (acked_packet_number > 4) {
+            bool new_update = client_data_->update_throughput(acked_bytes);
+	        client_data_->update_rtt(rtt_stats_->smoothed_rtt());
+            if (new_update) {
+                DLOG(INFO) << "inside packet_number: " << acked_packet_number
+                    << ", total bytes are: " << client_data_->get_throughput()
+                    << ", total time elapsed is: " << client_data_->get_time_elapsed()
+                    << ", last_bw_estimate: " << client_data_->get_rate_estimate().ToDebugValue();
+            }        
+        }
+        double ss = client_data_->get_screen_size();
         // This is how we tell if we got a new chunk request.
         if (client_data_->get_buffer_estimate() != cur_buffer_estimate_) {
             DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<

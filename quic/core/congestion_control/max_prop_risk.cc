@@ -45,7 +45,6 @@ MaxPropRisk::MaxPropRisk(
       min_slow_start_exit_window_(min_congestion_window_),
       client_data_(nullptr),
       past_weight_(-1.0),
-      cur_buffer_estimate_(-1.0) {}
       cur_buffer_estimate_(-1.0),
       bandwidth_ests_(100, QuicBandwidth::Zero()),
       bandwidth_ix_(0) {}

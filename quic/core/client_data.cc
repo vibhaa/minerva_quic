@@ -15,6 +15,8 @@ ClientData::ClientData(const QuicClock* clock)
       total_throughput_(0),
       last_bw_(QuicBandwidth::Zero()),
       initial_time_(clock->WallNow()),
+      last_measurement_time_(clock->WallNow()),
+      bytes_since_last_measurement_(0),
       total_rtt_(QuicTime::Delta::Zero()),
       chunk_remainder_(0),
       last_update_time_(QuicWallTime::Zero()) {}
@@ -35,9 +37,6 @@ QuicByteCount ClientData::get_chunk_remainder() {
 }
   
 QuicBandwidth ClientData::get_rate_estimate() {
-  //QuicTime::Delta total_time = clock_->WallNow().AbsoluteDifference(initial_time_);
-  //DLOG(INFO) << "total time" << total_time.ToSeconds();
-  //return QuicBandwidth::FromBytesAndTimeDelta(total_throughput_, total_time);
   return last_bw_;
 }
 
@@ -45,17 +44,20 @@ void ClientData::update_rtt(QuicTime::Delta rtt){
   total_rtt_ = total_rtt_ + rtt;
 }
 
-void ClientData::update_throughput(QuicByteCount x) {
-  QuicTime::Delta diff = clock_->WallNow().AbsoluteDifference(initial_time_);
-  if (diff.ToMilliseconds() > 5000) {
-      last_bw_ = QuicBandwidth::FromBytesAndTimeDelta(total_throughput_, diff);
-      //total_throughput_ = 0;
-      //initial_time_ = clock_->WallNow();
-  }
-  /*if (total_throughput_ == 0){
-    initial_time_ = clock_->WallNow();
-    }*/
+bool ClientData::update_throughput(QuicByteCount x) {
+  QuicTime::Delta diff = clock_->WallNow().AbsoluteDifference(last_measurement_time_);
   total_throughput_ += x;
+  bytes_since_last_measurement_ += x;
+
+  if (diff.ToMilliseconds() > 5000) {
+      DLOG(INFO) << "bytes since last measurement " << bytes_since_last_measurement_
+          << "elapsed time " << diff.ToDebugValue();
+      last_bw_ = QuicBandwidth::FromBytesAndTimeDelta(bytes_since_last_measurement_, diff);
+      last_measurement_time_ = clock_->WallNow();
+      bytes_since_last_measurement_ = 0;
+      return true;
+  }
+  return false;
 }
 
 QuicByteCount ClientData::get_throughput() {

@@ -27,7 +27,8 @@ class QUIC_EXPORT_PRIVATE ClientData {
   QuicWallTime get_last_update_time();
   double get_screen_size();
   void update_rtt(QuicTime::Delta rtt);
-  void update_throughput(QuicByteCount throughput);
+  // Returns true if a new bandwidth estimate is available.
+  bool update_throughput(QuicByteCount throughput);
   QuicByteCount get_throughput();
   QuicTime::Delta get_time_elapsed();
   QuicTime::Delta get_total_rtt();
@@ -44,6 +45,8 @@ class QUIC_EXPORT_PRIVATE ClientData {
   QuicByteCount total_throughput_;
   QuicBandwidth last_bw_;
   QuicWallTime initial_time_;
+  QuicWallTime last_measurement_time_;
+  QuicByteCount bytes_since_last_measurement_;
   QuicTime::Delta total_rtt_;
   QuicByteCount chunk_remainder_;
   QuicWallTime last_update_time_;
