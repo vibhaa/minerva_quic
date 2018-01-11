@@ -191,6 +191,7 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
 	        client_data_->update_rtt(rtt_stats_->smoothed_rtt());
             if (new_update) {
                 DLOG(INFO) << "inside packet_number: " << acked_packet_number
+                    << ", congestion window: " << congestion_window_
                     << ", total bytes are: " << client_data_->get_throughput()
                     << ", total time elapsed is: " << client_data_->get_time_elapsed()
                     << ", last_bw_estimate: " << client_data_->get_rate_estimate().ToDebugValue();
