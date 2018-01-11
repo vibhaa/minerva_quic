@@ -11,6 +11,7 @@ ClientData::ClientData(const QuicClock* clock)
     : buffer_estimate_(0.0),
       screen_size_(0.0),
       client_id_(rand() % 10000 + 1),
+      chunk_index_(-1),
       clock_(clock),
       total_throughput_(0),
       last_bw_(QuicBandwidth::Zero()),
@@ -25,6 +26,7 @@ ClientData::~ClientData() {}
 
 void ClientData::reset_chunk_remainder(QuicByteCount x) {
     chunk_remainder_ = x;
+    chunk_index_++;
 }
 
 void ClientData:: update_chunk_remainder(QuicByteCount x) {
@@ -34,6 +36,10 @@ void ClientData:: update_chunk_remainder(QuicByteCount x) {
 
 QuicByteCount ClientData::get_chunk_remainder() {
     return chunk_remainder_;
+}
+
+int ClientData::get_chunk_index() {
+    return chunk_index_;
 }
   
 QuicBandwidth ClientData::get_rate_estimate() {

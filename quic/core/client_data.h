@@ -22,6 +22,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   void reset_chunk_remainder(QuicByteCount x);
   void update_chunk_remainder(QuicByteCount x);
   QuicByteCount get_chunk_remainder();
+  int get_chunk_index();
   QuicBandwidth get_rate_estimate();
   double get_buffer_estimate();
   QuicWallTime get_last_update_time();
@@ -41,6 +42,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   double buffer_estimate_;
   double screen_size_;
   double client_id_;
+  int chunk_index_;
   const QuicClock* clock_;
   QuicByteCount total_throughput_;
   QuicBandwidth last_bw_;
