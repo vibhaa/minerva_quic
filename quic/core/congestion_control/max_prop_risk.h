@@ -75,6 +75,8 @@ class QUIC_EXPORT_PRIVATE MaxPropRisk : public TcpCubicSenderBase {
   // Provide an estimate of the long-term bandwidth estimate seen by this connection.
   QuicBandwidth LongTermBandwidthEstimate() const;
 
+  double CwndMultiplier();
+
  private:
   friend class test::MaxPropRiskPeer;
 

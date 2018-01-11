@@ -205,7 +205,38 @@ QuicByteCount MaxPropRisk::GetSlowStartThreshold() const {
   return slowstart_threshold_;
 }
 
-
+double MaxPropRisk::CwndMultiplier() {
+    double multiplier = 1.0;
+    double weight = 1.0;
+    if (client_data_ != nullptr) {
+      double ss = client_data_->get_screen_size();
+      // every computation uses bytes and seconds
+      double risk_rate = 100 * 1000 * 1000;
+      double buf_est = client_data_->get_buffer_estimate();
+      if (buf_est > 0) {
+          risk_rate = client_data_->get_chunk_remainder() / buf_est; // TODO: prevent o division error
+      }
+      double risk_window = risk_rate * rtt_stats_->latest_rtt().ToMilliseconds() / 1000.0;
+      double risk_weight = past_weight_ * risk_window / congestion_window_; //cwnd is in bytes
+      if (ss > 0){
+        DLOG(INFO) << "chunk remainder is " << client_data_->get_chunk_remainder() << " buffer is " << buf_est;
+        DLOG(INFO) << "rtt is in ms " << rtt_stats_->latest_rtt().ToMilliseconds() << " last window is " << congestion_window_;
+        DLOG(INFO) << "risk rate is " << risk_rate << " risk window is " << risk_window;
+        DLOG(INFO) << "risk weight is " << risk_weight << "screen size is " << ss;
+      }
+      risk_weight = fmin(risk_weight, 100);
+      if (ss > 0 || risk_weight > 0) {
+        weight = std::max(ss * ss, risk_weight);
+      }
+      if (client_data_->get_chunk_index() >= 1) {
+          multiplier = weight;
+      } else {
+          multiplier = ss * ss;
+      }
+      past_weight_ = weight;
+    }
+    return multiplier;
+}
 
 // Called when we receive an ack. Normal TCP tracks how many packets one ack
 // represents, but quic has a separate ack for each packet.
@@ -215,8 +246,6 @@ void MaxPropRisk::MaybeIncreaseCwnd(
     QuicByteCount prior_in_flight,
     QuicTime event_time) {
   
-    double multiplier = 1.0;
-    double weight = 1.0;
     if (client_data_ != nullptr) {
       double ss = client_data_->get_screen_size();
       client_data_->update_chunk_remainder(acked_bytes);
@@ -226,22 +255,6 @@ void MaxPropRisk::MaybeIncreaseCwnd(
               LongTermBandwidthEstimate().ToDebugValue();
           cur_buffer_estimate_ = client_data_->get_buffer_estimate();
       }
-
-      // every computation uses bytes and seconds
-      double risk_rate = client_data_->get_chunk_remainder() / client_data_->get_buffer_estimate(); // TODO: prevent o division error
-  	  double risk_window = risk_rate * rtt_stats_->latest_rtt().ToMilliseconds() / 1000.0;
-      double risk_weight = past_weight_ * risk_window / congestion_window_; //cwnd is in bytes
-      if (ss > 0){
-        DLOG(INFO) << "chunk remainder is " << client_data_->get_chunk_remainder() << "buffer is " << client_data_->get_buffer_estimate();
-        DLOG(INFO) << "rtt is in ms " << rtt_stats_->latest_rtt().ToMilliseconds() << "last window is" << congestion_window_;
-        DLOG(INFO) << "risk rate is " << risk_rate << " risk window is " << risk_window;
-        DLOG(INFO) << "risk weight is " << risk_weight << "screen size is " << ss;
-      }
-      if (ss > 0 || risk_weight > 0) {
-        weight = std::max(ss, risk_weight);
-      }
-      multiplier = weight * weight;
-      past_weight_ = weight;
     }
 
   QUIC_BUG_IF(InRecovery()) << "Never increase the CWND during recovery.";
@@ -277,7 +290,7 @@ void MaxPropRisk::MaybeIncreaseCwnd(
       bandwidth_ests_[bandwidth_ix_] = InstantaneousBandwidth();
       bandwidth_ix_ = (bandwidth_ix_ + 1) % bandwidth_ests_.size(); 
       
-      congestion_window_ += int(multiplier * kDefaultTCPMSS);
+      congestion_window_ += (int64_t)(CwndMultiplier() * kDefaultTCPMSS);
       num_acked_packets_ = 0;
     }
 
