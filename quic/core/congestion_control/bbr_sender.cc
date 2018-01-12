@@ -136,6 +136,7 @@ BbrSender::DebugState::DebugState(const DebugState& state) = default;
       probe_rtt_disabled_if_app_limited_(false),
       app_limited_since_last_probe_rtt_(false),
       client_data_(nullptr),
+      last_time_(QuicWallTime::Zero()),
       min_rtt_since_last_probe_rtt_(QuicTime::Delta::Infinite()) {
   EnterStartupMode();
 }
@@ -158,15 +159,19 @@ void BbrSender::OnPacketSent(QuicTime sent_time,
   last_sent_packet_ = packet_number;
 
   std::ofstream bw_log_file;
-  bw_log_file.open("quic_bw.log", std::ios::app);
+  bw_log_file.open("quic_bw_bbr.log", std::ios::app);
   double ss = client_data_->get_screen_size();
-  if (ss > 0) {
-    bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3)
-		<< clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
-		<< ", \"clientId\": " << client_data_->get_client_id()
-		<< ", \"bandwidth_Mbps\": " << BandwidthEstimate().ToKBitsPerSecond()/1000.0
-		<< ", \"screen_size\": " << ss
-		<< "}\n";
+  QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_time_);
+  if (ss > 0 && time_elapsed > rtt_stats_->smoothed_rtt()) { 
+        last_time_ = clock_->WallNow();
+        bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
+                 << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
+                 << ", \"clientId\": " << client_data_->get_client_id()
+                 << ", \"bandwidth_Mbps\": " << client_data_->get_rate_estimate().ToKBitsPerSecond()/1000.0
+                 << ", \"total throughput\": "<< client_data_->get_throughput()
+                 << ", \"congestion_window\": "<< GetCongestionWindow()
+                 << ", \"screen_size\": " << ss
+                 << "}\n";
   }
   bw_log_file.close();
   

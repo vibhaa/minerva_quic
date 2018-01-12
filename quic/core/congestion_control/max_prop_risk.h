@@ -111,6 +111,9 @@ class QUIC_EXPORT_PRIVATE MaxPropRisk : public TcpCubicSenderBase {
   // Client data that holds client state
   ClientData* client_data_;
 
+  // last time when window was recorded
+  QuicWallTime last_time_;
+
   // last weight used for decentralized max prop and risk
   double past_weight_;
 

@@ -353,6 +353,8 @@ class QUIC_EXPORT_PRIVATE BbrSender : public SendAlgorithmInterface {
   bool probe_rtt_disabled_if_app_limited_;
   bool app_limited_since_last_probe_rtt_;
   ClientData* client_data_;
+  // last time when window was recorded
+  QuicWallTime last_time_;
   QuicTime::Delta min_rtt_since_last_probe_rtt_;
 
   DISALLOW_COPY_AND_ASSIGN(BbrSender);

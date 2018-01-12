@@ -6,6 +6,9 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <fstream>
+#include <iostream>
+#include <iomanip>
 
 #include "net/quic/core/congestion_control/prr_sender.h"
 #include "net/quic/core/congestion_control/rtt_stats.h"
@@ -41,9 +44,15 @@ TcpCubicSenderBytes::TcpCubicSenderBytes(
                                      kDefaultTCPMSS),
       initial_max_tcp_congestion_window_(max_congestion_window *
                                          kDefaultTCPMSS),
+      client_data_(nullptr),
+      last_time_(QuicWallTime::Zero()),
       min_slow_start_exit_window_(min_congestion_window_) {}
 
 TcpCubicSenderBytes::~TcpCubicSenderBytes() {}
+
+void TcpCubicSenderBytes::SetAuxiliaryClientData(ClientData* cdata) {
+    client_data_ = cdata;
+}
 
 void TcpCubicSenderBytes::SetFromConfig(const QuicConfig& config,
                                         Perspective perspective) {
@@ -169,6 +178,24 @@ void TcpCubicSenderBytes::MaybeIncreaseCwnd(
   QUIC_BUG_IF(InRecovery()) << "Never increase the CWND during recovery.";
   // Do not increase the congestion window unless the sender is close to using
   // the current window.
+  std::ofstream bw_log_file;
+  bw_log_file.open("quic_bw_cubic.log", std::ios::app);
+  if (client_data_ != nullptr){
+    double ss = client_data_->get_screen_size();
+    QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_time_);
+    if (ss > 0 && time_elapsed > rtt_stats_->smoothed_rtt()) { 
+          last_time_ = clock_->WallNow();
+          bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
+                   << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
+                   << ", \"clientId\": " << client_data_->get_client_id()
+                   << ", \"bandwidth_Mbps\": " << client_data_->get_rate_estimate().ToKBitsPerSecond()/1000.0
+                   << ", \"total throughput\": "<< client_data_->get_throughput()
+                   << ", \"congestion_window\": "<< congestion_window_
+                   << ", \"screen_size\": " << ss
+                   << "}\n";
+    }
+  }
+  bw_log_file.close();
   if (!IsCwndLimited(prior_in_flight)) {
     cubic_.OnApplicationLimited();
     return;

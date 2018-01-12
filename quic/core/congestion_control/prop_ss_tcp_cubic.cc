@@ -46,6 +46,7 @@ PropSSTcpCubic::PropSSTcpCubic(
                                          kDefaultTCPMSS),
       min_slow_start_exit_window_(min_congestion_window_),
       client_data_(nullptr),
+      last_time_(QuicWallTime::Zero()),
       cur_buffer_estimate_(-1.0) {}
 
 PropSSTcpCubic::~PropSSTcpCubic() {}
@@ -183,7 +184,7 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
     QuicTime event_time) {
 
     std::ofstream bw_log_file;
-    bw_log_file.open("quic_bw.log", std::ios::app);
+    bw_log_file.open("quic_bw_prop_ss.log", std::ios::app);
     double multiplier = 1.0;
     if (client_data_ != nullptr) {
         if (acked_packet_number > 4) {
@@ -197,20 +198,24 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
                     << ", last_bw_estimate: " << client_data_->get_rate_estimate().ToDebugValue();
             }        
         }
+
         double ss = client_data_->get_screen_size();
+        QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_time_);
+        if (ss > 0 && time_elapsed > rtt_stats_->smoothed_rtt()) { 
+              last_time_ = clock_->WallNow();
+              bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
+                       << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
+                       << ", \"clientId\": " << client_data_->get_client_id()
+                       << ", \"bandwidth_Mbps\": " << client_data_->get_rate_estimate().ToKBitsPerSecond()/1000.0
+                       << ", \"total throughput\": "<< client_data_->get_throughput()
+                       << ", \"congestion_window\": "<< congestion_window_
+                       << ", \"screen_size\": " << ss
+                       << "}\n";
+        }
         // This is how we tell if we got a new chunk request.
         if (client_data_->get_buffer_estimate() != cur_buffer_estimate_) {
             DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<
                 BandwidthEstimate().ToDebugValue();
-            if (ss > 0) { 
-              bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
-                       << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
-                       << ", \"clientId\": " << client_data_->get_client_id()
-		       << ", \"bandwidth_Mbps\": " << client_data_->get_rate_estimate().ToKBitsPerSecond()/1000.0
-		       << ", \"total throughput\": "<< client_data_->get_throughput()
-		       << ", \"screen_size\": " << ss
-                       << "}\n";
-            }
             cur_buffer_estimate_ = client_data_->get_buffer_estimate();
         }
         if (ss > 0) {

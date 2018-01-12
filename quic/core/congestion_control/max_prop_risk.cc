@@ -6,6 +6,9 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <fstream>
+#include <iostream>
+#include <iomanip>
 
 #include "net/quic/core/quic_bandwidth.h"
 #include "net/quic/core/congestion_control/prr_sender.h"
@@ -44,6 +47,7 @@ MaxPropRisk::MaxPropRisk(
                                          kDefaultTCPMSS),
       min_slow_start_exit_window_(min_congestion_window_),
       client_data_(nullptr),
+      last_time_(QuicWallTime::Zero()),
       past_weight_(-1.0),
       cur_buffer_estimate_(-1.0),
       bandwidth_ests_(100, QuicBandwidth::Zero()),
@@ -224,7 +228,7 @@ double MaxPropRisk::CwndMultiplier() {
         DLOG(INFO) << "risk rate is " << risk_rate << " risk window is " << risk_window;
         DLOG(INFO) << "risk weight is " << risk_weight << "screen size is " << ss;
       }
-      risk_weight = fmin(risk_weight, 100);
+      risk_weight = fmin(risk_weight, 50);
       if (ss > 0 || risk_weight > 0) {
         weight = std::max(ss * ss, risk_weight);
       }
@@ -246,8 +250,25 @@ void MaxPropRisk::MaybeIncreaseCwnd(
     QuicByteCount prior_in_flight,
     QuicTime event_time) {
   
+    std::ofstream bw_log_file;
+    bw_log_file.open("quic_bw_mpr.log", std::ios::app);
     if (client_data_ != nullptr) {
       double ss = client_data_->get_screen_size();
+
+      // log data
+      QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_time_);
+      if (ss > 0 && time_elapsed > rtt_stats_->smoothed_rtt()) { 
+            last_time_ = clock_->WallNow();
+            bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
+                     << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
+                     << ", \"clientId\": " << client_data_->get_client_id()
+                     << ", \"bandwidth_Mbps\": " << client_data_->get_rate_estimate().ToKBitsPerSecond()/1000.0
+                     << ", \"total throughput\": "<< client_data_->get_throughput()
+                     << ", \"congestion_window\": "<< congestion_window_
+                     << ", \"screen_size\": " << ss
+                     << "}\n";
+      }
+
       client_data_->update_chunk_remainder(acked_bytes);
         // This is how we tell if we got a new chunk request.
       if (client_data_->get_buffer_estimate() != cur_buffer_estimate_) {
@@ -256,6 +277,7 @@ void MaxPropRisk::MaybeIncreaseCwnd(
           cur_buffer_estimate_ = client_data_->get_buffer_estimate();
       }
     }
+    bw_log_file.close();
 
   QUIC_BUG_IF(InRecovery()) << "Never increase the CWND during recovery.";
   // Do not increase the congestion window unless the sender is close to using

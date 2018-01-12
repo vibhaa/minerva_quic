@@ -66,7 +66,7 @@ class QUIC_EXPORT_PRIVATE TcpCubicSenderBytes : public TcpCubicSenderBase {
                          QuicByteCount prior_in_flight,
                          QuicTime event_time) override;
   void HandleRetransmissionTimeout() override;
-  void SetAuxiliaryClientData(ClientData* cdata) override {}
+  void SetAuxiliaryClientData(ClientData* cdata) override ;
 
  private:
   friend class test::TcpCubicSenderBytesPeer;
@@ -95,6 +95,12 @@ class QUIC_EXPORT_PRIVATE TcpCubicSenderBytes : public TcpCubicSenderBase {
   // Initial maximum TCP congestion window in bytes. This variable can only be
   // set when this algorithm is created.
   const QuicByteCount initial_max_tcp_congestion_window_;
+
+    // Client data that holds client state
+  ClientData* client_data_;
+
+  // last time when window was recorded
+  QuicWallTime last_time_;
 
   // The minimum window when exiting slow start with large reduction.
   QuicByteCount min_slow_start_exit_window_;

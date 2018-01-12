@@ -102,6 +102,9 @@ class QUIC_EXPORT_PRIVATE PropSSTcpCubic : public TcpCubicSenderBase {
 
   // Client data that holds client state
   ClientData* client_data_;
+
+  // last time when window was recorded
+  QuicWallTime last_time_;
   
   // Current buffer estimate from the client.
   double cur_buffer_estimate_;
