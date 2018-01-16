@@ -260,6 +260,7 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
                   << " slowstart threshold: " << slowstart_threshold_
                   << " congestion window count: " << num_acked_packets_;
   } else {
+    cubic_.SetWeight(multiplier);
     congestion_window_ = std::min(
         max_congestion_window_,
         cubic_.CongestionWindowAfterAck(acked_bytes, congestion_window_,
@@ -285,7 +286,10 @@ void PropSSTcpCubic::OnConnectionMigration() {
 }
 
 CongestionControlType PropSSTcpCubic::GetCongestionControlType() const {
-  return kPropSS;
+  if (reno_)
+    return kPropSS;
+  else
+    return kPropSSCubic;
 }
 
 }  // namespace net

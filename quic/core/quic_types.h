@@ -209,7 +209,7 @@ enum QuicPacketPrivateFlags {
 // QUIC. Note that this is separate from the congestion feedback type -
 // some congestion control algorithms may use the same feedback type
 // (Reno and Cubic are the classic example for that).
-enum CongestionControlType { kCubicBytes, kRenoBytes, kBBR, kPCC, kPropSS, kMaxPropRisk };
+enum CongestionControlType { kCubicBytes, kRenoBytes, kBBR, kPCC, kPropSS, kPropSSCubic, kMaxPropRisk, kMPRCubic};
 
 enum LossDetectionType {
   kNack,          // Used to mimic TCP's loss detection.

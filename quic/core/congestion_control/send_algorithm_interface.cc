@@ -29,7 +29,7 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
     QuicPacketCount initial_congestion_window) {
   QuicPacketCount max_congestion_window = kDefaultMaxCongestionWindowPackets;
   // Hardcode our choice of congestion control :O
-  congestion_control_type = kPropSS;
+  //congestion_control_type = kPropSS;
   switch (congestion_control_type) {
     case kBBR:
       DLOG(INFO) << "Congestion control type is BBR";
@@ -59,10 +59,20 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
       return new PropSSTcpCubic(
           clock, rtt_stats, true /* use Reno */,
           initial_congestion_window, max_congestion_window, stats);
+    case kPropSSCubic:
+      DLOG(INFO) << "Congestion control type is Prop SS over Cubic";
+      return new PropSSTcpCubic(
+          clock, rtt_stats, false /* dont use Reno */,
+          initial_congestion_window, max_congestion_window, stats);
     case kMaxPropRisk:
       DLOG(INFO) << "Congestion control type is MaxPropRisk";
       return new MaxPropRisk(
           clock, rtt_stats, true /* use Reno */,
+          initial_congestion_window, max_congestion_window, stats);
+    case kMPRCubic:
+      DLOG(INFO) << "Congestion control type is MaxPropRiskCubic";
+      return new MaxPropRisk(
+          clock, rtt_stats, false /* don't use Reno */,
           initial_congestion_window, max_congestion_window, stats);
   }
   return nullptr;

@@ -183,6 +183,9 @@ void TcpCubicSenderBytes::MaybeIncreaseCwnd(
   if (client_data_ != nullptr){
     double ss = client_data_->get_screen_size();
     QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_time_);
+    if (ss > 0) {
+      SetNumEmulatedConnections((int) ss);
+    }
     if (ss > 0 && time_elapsed > rtt_stats_->smoothed_rtt()) { 
           last_time_ = clock_->WallNow();
           bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 

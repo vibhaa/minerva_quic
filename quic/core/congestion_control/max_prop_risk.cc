@@ -320,6 +320,7 @@ void MaxPropRisk::MaybeIncreaseCwnd(
                   << " slowstart threshold: " << slowstart_threshold_
                   << " congestion window count: " << num_acked_packets_;
   } else {
+    cubic_.SetWeight(CwndMultiplier());
     congestion_window_ = std::min(
         max_congestion_window_,
         cubic_.CongestionWindowAfterAck(acked_bytes, congestion_window_,

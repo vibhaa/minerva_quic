@@ -29,6 +29,8 @@ class QUIC_EXPORT_PRIVATE CubicBytes {
 
   void SetNumConnections(int num_connections);
 
+  void SetWeight(double weight);
+
   // Call after a timeout to reset the cubic state.
   void ResetCubicState();
 
@@ -88,6 +90,9 @@ class QUIC_EXPORT_PRIVATE CubicBytes {
 
   // Number of connections to simulate.
   int num_connections_;
+
+  // Weight to simulate.
+  double weight_;
 
   // Time when this cycle started, after last loss event.
   QuicTime epoch_;

@@ -180,6 +180,7 @@ void QuicSentPacketManager::ResumeConnectionState(
 void QuicSentPacketManager::SetNumOpenStreams(size_t num_streams) {
   if (n_connection_simulation_) {
     // Ensure the number of connections is between 1 and 5.
+    DLOG(INFO) << "increasing number of connections here to blah";
     send_algorithm_->SetNumEmulatedConnections(
         std::min<size_t>(5, std::max<size_t>(1, num_streams)));
   }

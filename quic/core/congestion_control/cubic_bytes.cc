@@ -40,6 +40,7 @@ const float kBetaLastMax = 0.85f;
 CubicBytes::CubicBytes(const QuicClock* clock)
     : clock_(clock),
       num_connections_(kDefaultNumConnections),
+      weight_((double) kDefaultNumConnections),
       epoch_(QuicTime::Zero()),
       last_update_time_(QuicTime::Zero()),
       fix_convex_mode_(FLAGS_quic_reloadable_flag_quic_enable_cubic_fixes),
@@ -54,6 +55,11 @@ CubicBytes::CubicBytes(const QuicClock* clock)
 
 void CubicBytes::SetNumConnections(int num_connections) {
   num_connections_ = num_connections;
+  weight_ = (double) num_connections;
+}
+
+void CubicBytes::SetWeight(double weight) {
+  weight_ = weight;
 }
 
 float CubicBytes::Alpha() const {
@@ -61,7 +67,8 @@ float CubicBytes::Alpha() const {
   // beta here is a cwnd multiplier, and is equal to 1-beta from the paper.
   // We derive the equivalent alpha for an N-connection emulation as:
   const float beta = Beta();
-  return 3 * num_connections_ * num_connections_ * (1 - beta) / (1 + beta);
+  //return 3 * num_connections_ * num_connections_ * (1 - beta) / (1 + beta);
+  return 3 * weight_ * weight_ * (1 - beta) / (1 + beta);
 }
 
 float CubicBytes::Beta() const {
@@ -69,7 +76,8 @@ float CubicBytes::Beta() const {
   // emulation, which emulates the effective backoff of an ensemble of N
   // TCP-Reno connections on a single loss event. The effective multiplier is
   // computed as:
-  return (num_connections_ - 1 + kBeta) / num_connections_;
+  //return (num_connections_ - 1 + kBeta) / num_connections_;
+  return (weight_ - 1 + kBeta) / weight_;
 }
 
 float CubicBytes::BetaLastMax() const {
@@ -77,8 +85,12 @@ float CubicBytes::BetaLastMax() const {
   // N-connection emulation, which emulates the additional backoff of
   // an ensemble of N TCP-Reno connections on a single loss event. The
   // effective multiplier is computed as:
-  return fix_beta_last_max_
+  /*return fix_beta_last_max_
              ? (num_connections_ - 1 + kBetaLastMax) / num_connections_
+             : kBetaLastMax;*/
+
+  return fix_beta_last_max_
+             ? (weight_ - 1 + kBetaLastMax) / weight_
              : kBetaLastMax;
 }
 
