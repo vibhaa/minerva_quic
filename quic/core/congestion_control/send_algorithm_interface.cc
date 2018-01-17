@@ -9,6 +9,7 @@
 #include "net/quic/core/congestion_control/max_prop_risk.h"
 #include "net/quic/core/congestion_control/prop_ss_bbr_sender.h"
 #include "net/quic/core/congestion_control/vmaf_aware.h"
+#include "net/quic/core/congestion_control/prop_ss_fast_tcp.h"
 #include "net/quic/core/client_data.h"
 #include "net/quic/core/quic_packets.h"
 #include "net/quic/platform/api/quic_bug_tracker.h"
@@ -32,8 +33,7 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
   QuicPacketCount max_congestion_window = kDefaultMaxCongestionWindowPackets;
 
   // Hardcode our choice of congestion control :O
-  congestion_control_type = kVMAFAware;
-
+  congestion_control_type = kPropSSFast;
   switch (congestion_control_type) {
     case kBBR:
       DLOG(INFO) << "Congestion control type is BBR";
@@ -83,11 +83,16 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
       return new MaxPropRisk(
           clock, rtt_stats, false /* don't use Reno */,
           initial_congestion_window, max_congestion_window, stats);
-      case kVMAFAware:
+    case kVMAFAware:
       DLOG(INFO) << "Congestion control type is VMAFAware";
       return new VmafAware(
           clock, rtt_stats, false /*dont use Reno */,
           initial_congestion_window, max_congestion_window, stats);
+    case kPropSSFast:
+      DLOG(INFO) << "Congestion control type is PropSSFastTcp";
+      return new PropSSFastTcp(
+              clock, rtt_stats, initial_congestion_window,
+              max_congestion_window, stats);
   }
   return nullptr;
 }
