@@ -86,7 +86,7 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
       case kVMAFAware:
       DLOG(INFO) << "Congestion control type is VMAFAware";
       return new VmafAware(
-          clock, rtt_stats, true /* use Reno */,
+          clock, rtt_stats, false /*dont use Reno */,
           initial_congestion_window, max_congestion_window, stats);
   }
   return nullptr;

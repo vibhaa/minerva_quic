@@ -114,6 +114,9 @@ class QUIC_EXPORT_PRIVATE VmafAware : public TcpCubicSenderBase {
   // last time when window was recorded
   QuicWallTime last_time_;
 
+  // last time when weight was updated
+  QuicWallTime last_weight_update_time_;
+
   // last weight used for decentralized max prop and risk
   double past_weight_;
 
@@ -126,6 +129,12 @@ class QUIC_EXPORT_PRIVATE VmafAware : public TcpCubicSenderBase {
   std::vector<QuicBandwidth> bandwidth_ests_;
   // Index into the bandwidth_ests_ vector
   int bandwidth_ix_;
+
+  double log_multiplier, log_prev_rate;
+
+  QuicByteCount accum_acked_bytes;
+
+
 
   DISALLOW_COPY_AND_ASSIGN(VmafAware);
 };

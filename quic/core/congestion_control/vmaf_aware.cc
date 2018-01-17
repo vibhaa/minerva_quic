@@ -48,10 +48,14 @@ VmafAware::VmafAware(
       min_slow_start_exit_window_(min_congestion_window_),
       client_data_(nullptr),
       last_time_(QuicWallTime::Zero()),
+      last_weight_update_time_(QuicWallTime::Zero()),
       past_weight_(-1.0),
       cur_buffer_estimate_(-1.0),
       bandwidth_ests_(100, QuicBandwidth::Zero()),
-      bandwidth_ix_(0) {}
+      bandwidth_ix_(0), 
+      log_multiplier(-1), 
+      log_prev_rate(-1),
+      accum_acked_bytes(0){}
 
 VmafAware::~VmafAware() {}
 
@@ -209,21 +213,21 @@ QuicByteCount VmafAware::GetSlowStartThreshold() const {
   return slowstart_threshold_;
 }
 
-double log_multiplier = -1, log_prev_rate = -1;
-
 double VmafAware::CwndMultiplier() {
     double multiplier = 1.0;
     double weight = 1.0;
-    double qoes[][6] = {{1.987, 4.6, 6.84, 9.51, 12.59, 15.53}, {3.77, 8.15, 11.34, 14.49, 17.26, 19.0}};
-    double br[] = {300.0, 750.0, 1200.0, 1850.0, 2850.0, 4300.0}; // in Kbps
     const int num_bitrates = 6;
+    double qoes[][num_bitrates] = {{3.77, 8.15, 11.34, 14.49, 17.26, 19.0}, {1.987, 4.6, 6.84, 9.51, 12.59, 15.53}};
+    double br[num_bitrates] = {300.0, 750.0, 1200.0, 1850.0, 2850.0, 4300.0}; // in Kbps
     int ss = client_data_ -> get_screen_size();
     int idx = ss - 1;
     assert( idx == 0 || idx == 1);
     
     DLOG(INFO) << "Index : " << idx;
     
-    double prev_rate = 8 * congestion_window_ / (rtt_stats_->latest_rtt().ToMilliseconds() / 1000.0); // units : bps
+    QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_weight_update_time_);
+    // double prev_rate = 8 * congestion_window_ / (rtt_stats_->latest_rtt().ToMilliseconds() / 1000.0); // units : bps
+    double prev_rate = 8 * accum_acked_bytes / ((time_elapsed.ToMilliseconds()) / 1000.0); // units : bps
     double qoe = -1.0;
 
     DLOG(INFO) << "prev_rate is " << prev_rate;
@@ -238,9 +242,8 @@ double VmafAware::CwndMultiplier() {
         DLOG(INFO) << "idx : " << idx << " i : " << i << " num : " << (qoes[idx][i] - qoes[idx][i-1]) << " num2: " << (br[i] - prev_rate)
               << " den : " << (br[i] - br[i-1]) << " qoe: " << qoe;
         break;
-      } 
+      }
     }
-    assert( qoe >= qoes[idx][0] && qoe <= qoes[idx][num_bitrates - 1] );
 
     DLOG(INFO) << "qoe is " << qoe;
 
@@ -252,6 +255,8 @@ double VmafAware::CwndMultiplier() {
       } else {
         assert(false); // This case shouldn't really happen.. recheck the above interpolation code please.
       }
+    } else {
+        assert( qoe >= qoes[idx][0] && qoe <= qoes[idx][num_bitrates - 1] );
     }
 
     if (client_data_ != nullptr) {
@@ -262,17 +267,25 @@ double VmafAware::CwndMultiplier() {
         DLOG(INFO) << "rtt is in ms " << rtt_stats_->latest_rtt().ToMilliseconds() << " last window is " << congestion_window_;
         DLOG(INFO) << "risk weight is " << risk_weight << " screen size is " << ss;
       }
-      weight = fmin(risk_weight, 50);
+      weight = fmin(risk_weight, 4);
       if (client_data_->get_chunk_index() >= 1) {
           multiplier = weight;
       } else {
           multiplier = ss * ss;
       }
-      past_weight_ = weight;
     }
-    
-    log_multiplier = multiplier;
-    log_prev_rate = prev_rate;
+
+    const int SECONDS_LAG = 2;
+
+    if (ss > 0 && time_elapsed < QuicTime::Delta::FromSeconds(SECONDS_LAG)){
+        multiplier = past_weight_;
+    } else if ( ss > 0 || past_weight_ < 0) {
+        past_weight_ = multiplier;
+        last_weight_update_time_ = clock_->WallNow();
+        accum_acked_bytes = 0;
+        log_multiplier = multiplier;
+        log_prev_rate = prev_rate;
+    }
 
     return multiplier;
 }
@@ -307,6 +320,7 @@ void VmafAware::MaybeIncreaseCwnd(
       }
 
       client_data_->update_chunk_remainder(acked_bytes);
+      accum_acked_bytes += acked_bytes;
         // This is how we tell if we got a new chunk request.
       if (client_data_->get_buffer_estimate() != cur_buffer_estimate_) {
           DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<
