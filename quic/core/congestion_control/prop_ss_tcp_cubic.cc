@@ -144,13 +144,17 @@ void PropSSTcpCubic::OnPacketLost(QuicPacketNumber packet_number,
     }
     congestion_window_ = congestion_window_ - kDefaultTCPMSS;
   } else if (reno_) {
-      float beta = RenoBeta();
+      //float beta = RenoBeta();
       /*if (client_data_ != nullptr) {
           double ss = client_data_->get_screen_size();
           beta = beta * num_connections_ - 0.5 + (3.0 * ss - 1)/(3.0 * ss + 1);
           beta = beta / num_connections_;
       }*/
-      congestion_window_ = congestion_window_ * beta;
+      double ss = client_data_->get_screen_size();
+      if (ss == 0)
+        ss = 1;
+      float new_beta = (ss - 1 + 0.5) / ss;
+      congestion_window_ = congestion_window_ * new_beta ;
   } else {
     congestion_window_ =
         cubic_.CongestionWindowAfterPacketLoss(congestion_window_);
@@ -219,7 +223,7 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
             cur_buffer_estimate_ = client_data_->get_buffer_estimate();
         }
         if (ss > 0) {
-            multiplier = ss * ss;
+            multiplier = ss;
         }
     }
     else {

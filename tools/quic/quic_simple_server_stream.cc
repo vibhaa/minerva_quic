@@ -202,7 +202,7 @@ void QuicSimpleServerStream::SendResponse() {
     uint64_t chunk_len = 0;
     QuicTextUtils::StringToUint64(response_headers.find("content-length")->second, &chunk_len);
     QUIC_DVLOG(0) << "chunk length is" << chunk_len;
-    spdy_session()->get_client_data()->reset_chunk_remainder(chunk_len);
+    spdy_session()->get_client_data()->reset_chunk_remainder(chunk_len);  
   }
 
   if (id() % 2 == 0) {
