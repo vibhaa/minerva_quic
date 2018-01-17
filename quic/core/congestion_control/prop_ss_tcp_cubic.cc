@@ -144,17 +144,19 @@ void PropSSTcpCubic::OnPacketLost(QuicPacketNumber packet_number,
     }
     congestion_window_ = congestion_window_ - kDefaultTCPMSS;
   } else if (reno_) {
-      //float beta = RenoBeta();
-      /*if (client_data_ != nullptr) {
+      float beta = RenoBeta();
+      /*double ss = client_data_->get_screen_size();
+      if (ss == 0) {
+        ss = 1;
+      }
+      ss *= 2;
+      if (client_data_ != nullptr) {
           double ss = client_data_->get_screen_size();
           beta = beta * num_connections_ - 0.5 + (3.0 * ss - 1)/(3.0 * ss + 1);
           beta = beta / num_connections_;
-      }*/
-      double ss = client_data_->get_screen_size();
-      if (ss == 0)
-        ss = 1;
-      float new_beta = (ss - 1 + 0.5) / ss;
-      congestion_window_ = congestion_window_ * new_beta ;
+      } */
+      //beta = (ss - 1 + 0.5) / ss;
+      congestion_window_ = congestion_window_ * beta ;
   } else {
     congestion_window_ =
         cubic_.CongestionWindowAfterPacketLoss(congestion_window_);
@@ -189,7 +191,6 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
 
     std::ofstream bw_log_file;
     bw_log_file.open("quic_bw_prop_ss.log", std::ios::app);
-    double multiplier = 1.0;
     if (client_data_ != nullptr) {
         if (acked_packet_number > 4) {
             bool new_update = client_data_->update_throughput(acked_bytes);
@@ -213,6 +214,7 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
                        << ", \"bandwidth_Mbps\": " << client_data_->get_rate_estimate().ToKBitsPerSecond()/1000.0
                        << ", \"total throughput\": "<< client_data_->get_throughput()
                        << ", \"congestion_window\": "<< congestion_window_
+                       << ", \"latest_rtt\": " << rtt_stats_->latest_rtt().ToMilliseconds()
                        << ", \"screen_size\": " << ss
                        << "}\n";
         }
@@ -223,7 +225,7 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
             cur_buffer_estimate_ = client_data_->get_buffer_estimate();
         }
         if (ss > 0) {
-            multiplier = ss;
+            SetNumEmulatedConnections(ss);
         }
     }
     else {
@@ -256,7 +258,7 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
     // than conventional Reno.
     if (num_acked_packets_ * num_connections_ >=
         congestion_window_ / kDefaultTCPMSS) {
-      congestion_window_ += int(multiplier * kDefaultTCPMSS);
+      congestion_window_ += int(kDefaultTCPMSS);
       num_acked_packets_ = 0;
     }
 
@@ -264,7 +266,6 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
                   << " slowstart threshold: " << slowstart_threshold_
                   << " congestion window count: " << num_acked_packets_;
   } else {
-    cubic_.SetWeight(multiplier);
     congestion_window_ = std::min(
         max_congestion_window_,
         cubic_.CongestionWindowAfterAck(acked_bytes, congestion_window_,

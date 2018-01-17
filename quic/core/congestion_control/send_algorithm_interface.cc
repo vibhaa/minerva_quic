@@ -7,6 +7,7 @@
 #include "net/quic/core/congestion_control/bbr_sender.h"
 #include "net/quic/core/congestion_control/prop_ss_tcp_cubic.h"
 #include "net/quic/core/congestion_control/max_prop_risk.h"
+#include "net/quic/core/congestion_control/prop_ss_bbr_sender.h"
 #include "net/quic/core/client_data.h"
 #include "net/quic/core/quic_packets.h"
 #include "net/quic/platform/api/quic_bug_tracker.h"
@@ -34,6 +35,11 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
     case kBBR:
       DLOG(INFO) << "Congestion control type is BBR";
       return new BbrSender(clock, rtt_stats, unacked_packets,
+                           initial_congestion_window, max_congestion_window,
+                           random);
+    case kPropSSBBR:
+      DLOG(INFO) << "Congestion control type is Prop SS BBR";
+      return new PropSSBbrSender(clock, rtt_stats, unacked_packets,
                            initial_congestion_window, max_congestion_window,
                            random);
     case kPCC:
