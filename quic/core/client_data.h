@@ -11,6 +11,7 @@
 #include "net/quic/core/quic_time.h"
 #include "net/quic/platform/api/quic_clock.h"
 #include "net/quic/core/quic_time.h"
+#include "net/quic/core/video.h"
 
 namespace net {
 
@@ -36,9 +37,9 @@ class QUIC_EXPORT_PRIVATE ClientData {
   void set_buffer_estimate(double current_buffer);
   void set_screen_size(double ss);
   double get_client_id();
+  Video* get_video();
 
  private:
-  //double rate_estimate_;
   double buffer_estimate_;
   double screen_size_;
   double client_id_;
@@ -52,6 +53,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   QuicTime::Delta total_rtt_;
   QuicByteCount chunk_remainder_;
   QuicWallTime last_update_time_;
+  Video vid_;
 };
 
 }  // namespace net

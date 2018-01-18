@@ -4,6 +4,7 @@
 #include "net/quic/platform/api/quic_clock.h"
 #include "net/quic/platform/api/quic_logging.h"
 #include <stdlib.h>
+#include <string>
 
 namespace net {
 
@@ -20,7 +21,7 @@ ClientData::ClientData(const QuicClock* clock)
       bytes_since_last_measurement_(0),
       total_rtt_(QuicTime::Delta::Zero()),
       chunk_remainder_(0),
-      last_update_time_(QuicWallTime::Zero()) {}
+      last_update_time_(QuicWallTime::Zero()){}
 
 ClientData::~ClientData() {}
 
@@ -92,6 +93,10 @@ double ClientData::get_client_id(){
   return client_id_;
 }
 
+Video* ClientData::get_video(){
+  return & vid_;
+}
+
 QuicWallTime ClientData::get_last_update_time() {
     return last_update_time_;
 }
@@ -103,6 +108,10 @@ void ClientData::set_buffer_estimate(double current_buffer){
 
 void ClientData::set_screen_size(double ss){
 	screen_size_ = ss;
+  vid_.set_screen_size(ss);
+  vid_.set_video_file("/home/ubuntu/video_transport_simulator/video_traces/video_trace_"
+                                                              + std::to_string(int(ss)) + ".dat");
+  // set vmaf scores also here
 }
 
 }  // namespace net

@@ -221,7 +221,7 @@ QuicByteCount VmafAware::GetSlowStartThreshold() const {
 }
 
 double VmafAware::CwndMultiplier() {
-    double multiplier = 1.0;
+
     double weight = 1.0;
     const int num_bitrates = 6;
     double qoes[][num_bitrates] = {{3.77, 8.15, 11.34, 14.49, 17.26, 19.0}, {1.987, 4.6, 6.84, 9.51, 12.59, 15.53}};
@@ -233,44 +233,22 @@ double VmafAware::CwndMultiplier() {
     DLOG(INFO) << "Index : " << idx;
     
     QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_weight_update_time_);
-    // double prev_rate = 8 * congestion_window_ / (rtt_stats_->latest_rtt().ToMilliseconds() / 1000.0); // units : bps
+
     double prev_rate = 8 * accum_acked_bytes / ((time_elapsed.ToMilliseconds()) / 1000.0); // units : bps
-    double qoe = -1.0;
 
     DLOG(INFO) << "prev_rate is " << prev_rate;
 
     for (int i = 0; i < num_bitrates; ++i) {
       br[i] = 1000.0 * br[i];
     }
-    // for (int i = 1; i < num_bitrates; ++i){
-    //   if ( prev_rate <= br[i] ) {
-    //     qoe = qoes[idx][i-1];
-    //     qoe += ((qoes[idx][i] - qoes[idx][i-1]) / (br[i] - br[i-1])) * (br[i] - prev_rate);
-    //     DLOG(INFO) << "idx : " << idx << " i : " << i << " num : " << (qoes[idx][i] - qoes[idx][i-1]) << " num2: " << (br[i] - prev_rate)
-    //           << " den : " << (br[i] - br[i-1]) << " qoe: " << qoe;
-    //     break;
-    //   }
-    // }
+     
+    // dummy chunk index of -1
+    double qoe = client_data_ -> get_video() -> qoe(client_data_ -> get_chunk_index(), prev_rate / 1e3);
+    DLOG(INFO) << "qoe : " << qoe;
 
-    qoe = 20 - 20 * exp(-3.0 * prev_rate / ss / 4300.0 / 1e3);
+    assert (client_data_ != nullptr);
 
-    DLOG(INFO) << "qoe is " << qoe;
-
-    // if (qoe < 0) {
-    //   if (prev_rate < br[0]) {
-    //     qoe = qoes[idx][0];
-    //   } else if (prev_rate > br[num_bitrates - 1]) {
-    //     qoe = qoes[idx][num_bitrates - 1];
-    //   } else {
-    //     assert(false); // This case shouldn't really happen.. recheck the above interpolation code please.
-    //   }
-    // } else {
-    //     assert( qoe >= qoes[idx][0] && qoe <= qoes[idx][num_bitrates - 1] );
-    // }
-
-    if (client_data_ != nullptr) {
       double vmaf_weight = (prev_rate / qoe) * (qoes[0][0] / br[0]); //cwnd is in bytes
-      vmaf_weight = fmin(vmaf_weight, sqrt(50));
 
       // risk calculation
       double risk_rate = 0;
@@ -278,32 +256,30 @@ double VmafAware::CwndMultiplier() {
       if (buf_est > 0) {
           risk_rate = client_data_->get_chunk_remainder() / buf_est; // TODO: prevent o division error
       }
-      double risk_window = risk_rate * rtt_stats_->latest_rtt().ToMilliseconds() / 1000.0;
-      double risk_weight = past_weight_ * risk_window / congestion_window_; //cwnd is in bytes
-      risk_weight = fmin(risk_weight/5.0, 10);
-
+      
+      double risk_weight = risk_rate / prev_rate * past_weight_;
+      
       if (ss > 0){
         DLOG(INFO) << "chunk remainder is " << client_data_->get_chunk_remainder() << " buffer is " << client_data_->get_buffer_estimate();
         DLOG(INFO) << "rtt is in ms " << rtt_stats_->latest_rtt().ToMilliseconds() << " last window is " << congestion_window_;
         DLOG(INFO) << "risk weight is " << risk_weight << " screen size is " << ss << "vmaf weight is" << vmaf_weight;
       }
 
-      weight = std::max(vmaf_weight, risk_weight);
-      if (client_data_->get_chunk_index() >= 1) {
-          multiplier = weight;
-      } else {
-          multiplier = ss;
-      }
-    }
-    assert(multiplier > 0);
+     weight = std::max(vmaf_weight, risk_weight);
+
+     weight = fmin(weight, sqrt(50));
+  
+     if (client_data_->get_chunk_index() < 1) weight = ss;
+        
+    assert(weight > 0);
 
     const double MILLI_SECONDS_LAG = 500;
 
     if ( past_weight_ < 0 || time_elapsed >= QuicTime::Delta::FromMilliseconds(MILLI_SECONDS_LAG)) {
-        past_weight_ = multiplier;
+        past_weight_ = weight;
         last_weight_update_time_ = clock_->WallNow();
         accum_acked_bytes = 0;
-        log_multiplier = multiplier;
+        log_multiplier = weight;
         log_prev_rate = prev_rate;
     }
 

@@ -1,6 +1,5 @@
 android
 base
-BUILD.gn
 cert
 cert_net
 cookies
