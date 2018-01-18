@@ -130,11 +130,11 @@ class QUIC_EXPORT_PRIVATE VmafAware : public TcpCubicSenderBase {
   // Index into the bandwidth_ests_ vector
   int bandwidth_ix_;
 
-  double log_multiplier, log_prev_rate;
+  double log_multiplier;
+
+  double log_prev_rate;
 
   QuicByteCount accum_acked_bytes;
-
-
 
   DISALLOW_COPY_AND_ASSIGN(VmafAware);
 };

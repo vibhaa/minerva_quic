@@ -235,29 +235,31 @@ double VmafAware::CwndMultiplier() {
     for (int i = 0; i < num_bitrates; ++i) {
       br[i] = 1000.0 * br[i];
     }
-    for (int i = 1; i < num_bitrates; ++i){
-      if ( prev_rate <= br[i] ) {
-        qoe = qoes[idx][i-1];
-        qoe += ((qoes[idx][i] - qoes[idx][i-1]) / (br[i] - br[i-1])) * (br[i] - prev_rate);
-        DLOG(INFO) << "idx : " << idx << " i : " << i << " num : " << (qoes[idx][i] - qoes[idx][i-1]) << " num2: " << (br[i] - prev_rate)
-              << " den : " << (br[i] - br[i-1]) << " qoe: " << qoe;
-        break;
-      }
-    }
+    // for (int i = 1; i < num_bitrates; ++i){
+    //   if ( prev_rate <= br[i] ) {
+    //     qoe = qoes[idx][i-1];
+    //     qoe += ((qoes[idx][i] - qoes[idx][i-1]) / (br[i] - br[i-1])) * (br[i] - prev_rate);
+    //     DLOG(INFO) << "idx : " << idx << " i : " << i << " num : " << (qoes[idx][i] - qoes[idx][i-1]) << " num2: " << (br[i] - prev_rate)
+    //           << " den : " << (br[i] - br[i-1]) << " qoe: " << qoe;
+    //     break;
+    //   }
+    // }
+
+    qoe = 20 - 20 * exp(-3.0 * prev_rate / ss / 4300.0 / 1e3);
 
     DLOG(INFO) << "qoe is " << qoe;
 
-    if (qoe < 0) {
-      if (prev_rate < br[0]) {
-        qoe = qoes[idx][0];
-      } else if (prev_rate > br[num_bitrates - 1]) {
-        qoe = qoes[idx][num_bitrates - 1];
-      } else {
-        assert(false); // This case shouldn't really happen.. recheck the above interpolation code please.
-      }
-    } else {
-        assert( qoe >= qoes[idx][0] && qoe <= qoes[idx][num_bitrates - 1] );
-    }
+    // if (qoe < 0) {
+    //   if (prev_rate < br[0]) {
+    //     qoe = qoes[idx][0];
+    //   } else if (prev_rate > br[num_bitrates - 1]) {
+    //     qoe = qoes[idx][num_bitrates - 1];
+    //   } else {
+    //     assert(false); // This case shouldn't really happen.. recheck the above interpolation code please.
+    //   }
+    // } else {
+    //     assert( qoe >= qoes[idx][0] && qoe <= qoes[idx][num_bitrates - 1] );
+    // }
 
     if (client_data_ != nullptr) {
       double risk_weight = (prev_rate / qoe) * (qoes[0][0] / br[0]); //cwnd is in bytes
@@ -267,19 +269,18 @@ double VmafAware::CwndMultiplier() {
         DLOG(INFO) << "rtt is in ms " << rtt_stats_->latest_rtt().ToMilliseconds() << " last window is " << congestion_window_;
         DLOG(INFO) << "risk weight is " << risk_weight << " screen size is " << ss;
       }
-      weight = fmin(risk_weight, 4);
+      weight = fmin(risk_weight, 50);
       if (client_data_->get_chunk_index() >= 1) {
           multiplier = weight;
       } else {
-          multiplier = ss * ss;
+          multiplier = ss;
       }
     }
+    assert(multiplier > 0);
 
-    const int SECONDS_LAG = 2;
+    const double MILLI_SECONDS_LAG = 4 * 1e3;
 
-    if (ss > 0 && time_elapsed < QuicTime::Delta::FromSeconds(SECONDS_LAG)){
-        multiplier = past_weight_;
-    } else if ( ss > 0 || past_weight_ < 0) {
+    if ( past_weight_ < 0 || time_elapsed >= QuicTime::Delta::FromMilliseconds(MILLI_SECONDS_LAG)) {
         past_weight_ = multiplier;
         last_weight_update_time_ = clock_->WallNow();
         accum_acked_bytes = 0;
@@ -287,7 +288,7 @@ double VmafAware::CwndMultiplier() {
         log_prev_rate = prev_rate;
     }
 
-    return multiplier;
+    return past_weight_ * past_weight_;
 }
 
 // Called when we receive an ack. Normal TCP tracks how many packets one ack
@@ -316,11 +317,14 @@ void VmafAware::MaybeIncreaseCwnd(
                      << ", \"screen_size\": " << ss
                      << ", \"multiplier\": " << log_multiplier
                      << ", \"prev_rate\": " << log_prev_rate
+                     << ", \"past_weight\": " << past_weight_
+                     << ", \"accum_acked_bytes\": " << accum_acked_bytes
                      << "}\n";
       }
 
       client_data_->update_chunk_remainder(acked_bytes);
       accum_acked_bytes += acked_bytes;
+      assert(acked_bytes >= 0);
         // This is how we tell if we got a new chunk request.
       if (client_data_->get_buffer_estimate() != cur_buffer_estimate_) {
           DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<
@@ -338,6 +342,7 @@ void VmafAware::MaybeIncreaseCwnd(
     return;
   }
   if (congestion_window_ >= max_congestion_window_) {
+    assert(false); // well, wtf
     return;
   }
   if (InSlowStart()) {
