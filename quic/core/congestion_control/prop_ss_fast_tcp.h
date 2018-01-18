@@ -108,6 +108,8 @@ class QUIC_EXPORT_PRIVATE PropSSFastTcp : public TcpCubicSenderBase {
   // Current buffer estimate from the client.
   double cur_buffer_estimate_;
 
+  QuicWallTime start_time_;
+
   DISALLOW_COPY_AND_ASSIGN(PropSSFastTcp);
 };
 

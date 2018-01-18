@@ -46,7 +46,8 @@ PropSSFastTcp::PropSSFastTcp(
       min_slow_start_exit_window_(min_congestion_window_),
       client_data_(nullptr),
       last_time_(QuicWallTime::Zero()),
-      cur_buffer_estimate_(-1.0) {}
+      cur_buffer_estimate_(-1.0),
+      start_time_(clock->WallNow()) {}
 
 PropSSFastTcp::~PropSSFastTcp() {}
 
@@ -182,9 +183,22 @@ QuicByteCount PropSSFastTcp::GetSlowStartThreshold() const {
 
 void PropSSFastTcp::UpdateCongestionWindow() {
     double gamma = 0.99;
+    DLOG(INFO) << "Updating congestion window";
     if (client_data_ != nullptr) {
-        double new_wnd = (rtt_stats_->min_rtt().ToMilliseconds() / rtt_stats_->latest_rtt().ToMilliseconds()) * congestion_window_ + 10*client_data_->get_screen_size() * kDefaultTCPMSS; 
+        QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(start_time_);
+        int epoch = time_elapsed.ToMilliseconds() / 30000;
+        double ss = client_data_->get_screen_size();
+        double target = 1.0;
+        if (ss == 1.0) {
+            target = 5.0;
+        } else {
+            target = 5.0 * (epoch+1);
+        }
+        double minrtt = rtt_stats_->min_rtt().ToMilliseconds();
+        double new_wnd = (minrtt / rtt_stats_->latest_rtt().ToMilliseconds()) * congestion_window_ +
+           target * kDefaultTCPMSS; 
         congestion_window_ = (int)((1 - gamma) * congestion_window_ + gamma * new_wnd);
+        DLOG(INFO) << "Updating congestion window for ss " << client_data_->get_screen_size() << " window " << congestion_window_;
     }
 }
 
@@ -230,9 +244,6 @@ void PropSSFastTcp::MaybeIncreaseCwnd(
             DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<
                 BandwidthEstimate().ToDebugValue();
             cur_buffer_estimate_ = client_data_->get_buffer_estimate();
-        }
-        if (ss > 0) {
-            SetNumEmulatedConnections(ss);
         }
     }
     else {
