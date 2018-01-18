@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
+#include <math.h>
 
 #include "net/quic/core/quic_bandwidth.h"
 #include "net/quic/core/congestion_control/prr_sender.h"
@@ -262,14 +263,31 @@ double VmafAware::CwndMultiplier() {
     // }
 
     if (client_data_ != nullptr) {
-      double risk_weight = (prev_rate / qoe) * (qoes[0][0] / br[0]); //cwnd is in bytes
-      // risk_weight = fmax(risk_weight, 1.0);
+      double vmaf_weight = (prev_rate / qoe) * (qoes[0][0] / br[0]); //cwnd is in bytes
+      vmaf_weight = fmin(vmaf_weight, sqrt(50));
+
+      // risk calculation
+      double risk_rate = 100 * 1000 * 1000;
+      double buf_est = client_data_->get_buffer_estimate();
+      if (buf_est > 0) {
+          risk_rate = client_data_->get_chunk_remainder() / buf_est; // TODO: prevent o division error
+      }
+      else 
+          risk_rate = 0
+      double risk_window = risk_rate * rtt_stats_->latest_rtt().ToMilliseconds() / 1000.0;
+      double risk_weight = past_weight_ * risk_window / congestion_window_; //cwnd is in bytes
+      if (risk_weight != 0) {
+        risk_weight = sqrt(sqrt(fmax(risk_weight, 50)));
+      }
+
       if (ss > 0){
         DLOG(INFO) << "chunk remainder is " << client_data_->get_chunk_remainder() << " buffer is " << client_data_->get_buffer_estimate();
         DLOG(INFO) << "rtt is in ms " << rtt_stats_->latest_rtt().ToMilliseconds() << " last window is " << congestion_window_;
-        DLOG(INFO) << "risk weight is " << risk_weight << " screen size is " << ss;
+        DLOG(INFO) << "risk weight is " << risk_weight << " screen size is " << ss << "vmaf weight is" << vmaf_weight;
       }
-      weight = fmin(risk_weight, 50);
+
+      weight = std::max(vmaf_weight, risk_weight);
+      //weight = fmin(risk_weight, 50);
       if (client_data_->get_chunk_index() >= 1) {
           multiplier = weight;
       } else {
