@@ -76,6 +76,7 @@ class QUIC_EXPORT_PRIVATE MaxPropRisk : public TcpCubicSenderBase {
   QuicBandwidth LongTermBandwidthEstimate() const;
 
   double CwndMultiplier();
+  void UpdateCongestionWindow(double weight);
 
  private:
   friend class test::MaxPropRiskPeer;

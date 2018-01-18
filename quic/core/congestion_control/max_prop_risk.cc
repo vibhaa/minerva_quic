@@ -215,7 +215,7 @@ double MaxPropRisk::CwndMultiplier() {
     if (client_data_ != nullptr) {
       double ss = client_data_->get_screen_size();
       // every computation uses bytes and seconds
-      double risk_rate = 100 * 1000 * 1000;
+      double risk_rate = 0; //100 * 1000 * 1000;
       double buf_est = client_data_->get_buffer_estimate();
       if (buf_est > 0) {
           risk_rate = client_data_->get_chunk_remainder() / buf_est; // TODO: prevent o division error
@@ -226,20 +226,36 @@ double MaxPropRisk::CwndMultiplier() {
         DLOG(INFO) << "chunk remainder is " << client_data_->get_chunk_remainder() << " buffer is " << buf_est;
         DLOG(INFO) << "rtt is in ms " << rtt_stats_->latest_rtt().ToMilliseconds() << " last window is " << congestion_window_;
         DLOG(INFO) << "risk rate is " << risk_rate << " risk window is " << risk_window;
-        DLOG(INFO) << "risk weight is " << risk_weight << "screen size is " << ss;
+        if (risk_weight > 0) {
+          DLOG(INFO) << "risk weight is " << risk_weight << "screen size is " << ss;
+        }
       }
       risk_weight = fmin(risk_weight, 50);
+      //risk_weight = 1;
       if (ss > 0 || risk_weight > 0) {
-        weight = std::max(ss * ss, risk_weight);
+        //weight = std::max(ss * ss, risk_weight);
+        weight = std::max(ss, risk_weight);
       }
       if (client_data_->get_chunk_index() >= 1) {
           multiplier = weight;
       } else {
-          multiplier = ss * ss;
+          multiplier = ss;
       }
       past_weight_ = weight;
     }
     return multiplier;
+}
+
+void MaxPropRisk::UpdateCongestionWindow(double weight) {
+    //double weight = fmax(risk_weight, 3 * client_data_->get_screen_size());
+    double target = 3 * weight;
+    double gamma = 0.25;
+    if (client_data_ != nullptr) {
+        double minrtt = rtt_stats_->min_rtt().ToMilliseconds();
+        double new_wnd = (minrtt / rtt_stats_->latest_rtt().ToMilliseconds()) * congestion_window_ +
+           target * kDefaultTCPMSS; 
+        congestion_window_ = (int)((1 - gamma) * congestion_window_ + gamma * new_wnd);
+    }
 }
 
 // Called when we receive an ack. Normal TCP tracks how many packets one ack
@@ -266,6 +282,7 @@ void MaxPropRisk::MaybeIncreaseCwnd(
                      << ", \"total throughput\": "<< client_data_->get_throughput()
                      << ", \"congestion_window\": "<< congestion_window_
                      << ", \"screen_size\": " << ss
+                     << ", \"latest_rtt\": " << rtt_stats_->latest_rtt().ToMilliseconds()
                      << "}\n";
       }
 
@@ -312,7 +329,8 @@ void MaxPropRisk::MaybeIncreaseCwnd(
       bandwidth_ests_[bandwidth_ix_] = InstantaneousBandwidth();
       bandwidth_ix_ = (bandwidth_ix_ + 1) % bandwidth_ests_.size(); 
       
-      congestion_window_ += (int64_t)(CwndMultiplier() * kDefaultTCPMSS);
+      //congestion_window_ += (int64_t)(CwndMultiplier() * kDefaultTCPMSS);
+      UpdateCongestionWindow(CwndMultiplier());
       num_acked_packets_ = 0;
     }
 
