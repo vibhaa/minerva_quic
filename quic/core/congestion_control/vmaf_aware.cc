@@ -293,7 +293,7 @@ double VmafAware::CwndMultiplier() {
     }
     assert(multiplier > 0);
 
-    const double MILLI_SECONDS_LAG = 4 * 1e3;
+    const double MILLI_SECONDS_LAG = 500;
 
     if ( past_weight_ < 0 || time_elapsed >= QuicTime::Delta::FromMilliseconds(MILLI_SECONDS_LAG)) {
         past_weight_ = multiplier;
@@ -303,7 +303,16 @@ double VmafAware::CwndMultiplier() {
         log_prev_rate = prev_rate;
     }
 
-    return past_weight_ * past_weight_;
+    return past_weight_;
+}
+
+void VmafAware::UpdateCongestionWindow() {
+    double gamma = 0.99;
+    double minrtt = rtt_stats_->min_rtt().ToMilliseconds();
+    double target = CwndMultiplier();
+    double new_wnd = (minrtt / rtt_stats_->latest_rtt().ToMilliseconds()) * congestion_window_ +
+        target * kDefaultTCPMSS;
+    congestion_window_ = (int)((1-gamma) * congestion_window_ + gamma * new_wnd);
 }
 
 // Called when we receive an ack. Normal TCP tracks how many packets one ack
@@ -382,8 +391,8 @@ void VmafAware::MaybeIncreaseCwnd(
           rtt_stats_->latest_rtt().ToDebugValue();
       bandwidth_ests_[bandwidth_ix_] = InstantaneousBandwidth();
       bandwidth_ix_ = (bandwidth_ix_ + 1) % bandwidth_ests_.size(); 
-      
-      congestion_window_ += (int64_t)(CwndMultiplier() * kDefaultTCPMSS);
+      UpdateCongestionWindow();
+      //congestion_window_ += (int64_t)(CwndMultiplier() * kDefaultTCPMSS);
       num_acked_packets_ = 0;
     }
     QUIC_DVLOG(1) << "Reno; congestion window: " << congestion_window_

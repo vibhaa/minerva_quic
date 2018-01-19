@@ -77,6 +77,8 @@ class QUIC_EXPORT_PRIVATE VmafAware : public TcpCubicSenderBase {
 
   double CwndMultiplier();
 
+  // This is the fast TCP update rule.
+  void UpdateCongestionWindow();
  private:
   friend class test::VmafAwarePeer;
 
