@@ -182,6 +182,7 @@ QuicByteCount PropSSFastTcp::GetSlowStartThreshold() const {
 }
 
 void PropSSFastTcp::UpdateCongestionWindow() {
+<<<<<<< HEAD
     double gamma = 0.4;
     DLOG(INFO) << "Updating congestion window";
     if (client_data_ != nullptr) {
@@ -194,6 +195,13 @@ void PropSSFastTcp::UpdateCongestionWindow() {
         } else {
             target = 5.0 * ss;
         }
+=======
+    double gamma = 0.7;
+    DLOG(INFO) << "Updating congestion window";
+    if (client_data_ != nullptr) {
+        double ss = client_data_->get_screen_size();
+        double target = 5.0 * ss;
+>>>>>>> 7e9ea2d873bdb9a4bc1e11adab4b00ab96ac16be
         double minrtt = rtt_stats_->min_rtt().ToMilliseconds();
         double new_wnd = (minrtt / rtt_stats_->latest_rtt().ToMilliseconds()) * congestion_window_ +
            target * kDefaultTCPMSS; 
