@@ -226,11 +226,11 @@ double MaxPropRisk::CwndMultiplier() {
         DLOG(INFO) << "chunk remainder is " << client_data_->get_chunk_remainder() << " buffer is " << buf_est;
         DLOG(INFO) << "rtt is in ms " << rtt_stats_->latest_rtt().ToMilliseconds() << " last window is " << congestion_window_;
         DLOG(INFO) << "risk rate is " << risk_rate << " risk window is " << risk_window;
-        if (risk_weight > 0) {
+        if (risk_weight > 1) {
           DLOG(INFO) << "risk weight is " << risk_weight << "screen size is " << ss;
         }
       }
-      risk_weight = fmin(risk_weight, 50);
+      risk_weight = fmin(risk_weight/5.0, 10);
       //risk_weight = 1;
       if (ss > 0 || risk_weight > 0) {
         //weight = std::max(ss * ss, risk_weight);
@@ -249,7 +249,7 @@ double MaxPropRisk::CwndMultiplier() {
 void MaxPropRisk::UpdateCongestionWindow(double weight) {
     //double weight = fmax(risk_weight, 3 * client_data_->get_screen_size());
     double target = 3 * weight;
-    double gamma = 0.25;
+    double gamma = 0.4;
     if (client_data_ != nullptr) {
         double minrtt = rtt_stats_->min_rtt().ToMilliseconds();
         double new_wnd = (minrtt / rtt_stats_->latest_rtt().ToMilliseconds()) * congestion_window_ +
