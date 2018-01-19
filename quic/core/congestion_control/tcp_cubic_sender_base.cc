@@ -31,6 +31,7 @@ TcpCubicSenderBase::TcpCubicSenderBase(const QuicClock* clock,
       stats_(stats),
       reno_(reno),
       num_connections_(kDefaultNumConnections),
+      weight_(kDefaultNumConnections),
       largest_sent_packet_number_(0),
       largest_acked_packet_number_(0),
       largest_sent_at_last_cutback_(0),
@@ -100,6 +101,11 @@ void TcpCubicSenderBase::AdjustNetworkParameters(QuicBandwidth bandwidth,
 
 void TcpCubicSenderBase::SetNumEmulatedConnections(int num_connections) {
   num_connections_ = std::max(1, num_connections);
+  weight_ = num_connections_;
+}
+
+void TcpCubicSenderBase::SetWeight(float weight) {
+  weight_ = weight;
 }
 
 float TcpCubicSenderBase::RenoBeta() const {
@@ -107,7 +113,8 @@ float TcpCubicSenderBase::RenoBeta() const {
   // emulation, which emulates the effective backoff of an ensemble of N
   // TCP-Reno connections on a single loss event. The effective multiplier is
   // computed as:
-  return (num_connections_ - 1 + kRenoBeta) / num_connections_;
+  //return (num_connections_ - 1 + kRenoBeta) / num_connections_;
+  return (weight_ - 1 + kRenoBeta) / weight_;
 }
 
 void TcpCubicSenderBase::OnCongestionEvent(

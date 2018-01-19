@@ -47,6 +47,7 @@ class QUIC_EXPORT_PRIVATE TcpCubicSenderBase : public SendAlgorithmInterface {
   void AdjustNetworkParameters(QuicBandwidth bandwidth,
                                QuicTime::Delta rtt) override;
   void SetNumEmulatedConnections(int num_connections) override;
+  void SetWeight(float weight);
   void OnCongestionEvent(bool rtt_updated,
                          QuicByteCount prior_in_flight,
                          QuicTime event_time,
@@ -126,6 +127,9 @@ class QUIC_EXPORT_PRIVATE TcpCubicSenderBase : public SendAlgorithmInterface {
 
   // Number of connections to simulate.
   uint32_t num_connections_;
+
+  // Weight to simulate.
+  float weight_;
 
   // Track the largest packet that has been sent.
   QuicPacketNumber largest_sent_packet_number_;
