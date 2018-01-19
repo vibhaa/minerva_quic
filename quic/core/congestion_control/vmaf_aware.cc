@@ -308,8 +308,6 @@ double VmafAware::CwndMultiplier() {
     }
 
     return past_weight_;
-<<<<<<< HEAD
-=======
 }
 
 void VmafAware::UpdateCongestionWindow() {
@@ -319,7 +317,6 @@ void VmafAware::UpdateCongestionWindow() {
     double new_wnd = (minrtt / rtt_stats_->latest_rtt().ToMilliseconds()) * congestion_window_ +
         target * kDefaultTCPMSS;
     congestion_window_ = (int)((1-gamma) * congestion_window_ + gamma * new_wnd);
->>>>>>> 7e9ea2d873bdb9a4bc1e11adab4b00ab96ac16be
 }
 
 // Called when we receive an ack. Normal TCP tracks how many packets one ack
@@ -384,7 +381,8 @@ void VmafAware::MaybeIncreaseCwnd(
     return;
   }
 
-  SetWeight(CwndMultiplier());
+  // uncomment this to run RENO or CUBIC and not FastTCP
+  //SetWeight(CwndMultiplier());
 
   // Congestion avoidance.
   if (reno_) {
@@ -400,14 +398,10 @@ void VmafAware::MaybeIncreaseCwnd(
           rtt_stats_->smoothed_rtt().ToDebugValue() << ", instantaneous " <<
           rtt_stats_->latest_rtt().ToDebugValue();
       bandwidth_ests_[bandwidth_ix_] = InstantaneousBandwidth();
-      bandwidth_ix_ = (bandwidth_ix_ + 1) % bandwidth_ests_.size(); 
-<<<<<<< HEAD
+      bandwidth_ix_ = (bandwidth_ix_ + 1) % bandwidth_ests_.size();
       
       congestion_window_ += (int64_t)(kDefaultTCPMSS);
-=======
       UpdateCongestionWindow();
-      //congestion_window_ += (int64_t)(CwndMultiplier() * kDefaultTCPMSS);
->>>>>>> 7e9ea2d873bdb9a4bc1e11adab4b00ab96ac16be
       num_acked_packets_ = 0;
     }
     QUIC_DVLOG(1) << "Reno; congestion window: " << congestion_window_
