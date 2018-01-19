@@ -33,7 +33,7 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
   QuicPacketCount max_congestion_window = kDefaultMaxCongestionWindowPackets;
 
   // Hardcode our choice of congestion control :O
-  congestion_control_type = kMaxPropRisk;
+  congestion_control_type = kVMAFAware;
   switch (congestion_control_type) {
     case kBBR:
       DLOG(INFO) << "Congestion control type is BBR";

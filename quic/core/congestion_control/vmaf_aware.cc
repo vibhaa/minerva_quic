@@ -109,6 +109,12 @@ void VmafAware::SetMinCongestionWindowInPackets(
 void VmafAware::SetNumEmulatedConnections(int num_connections) {
   TcpCubicSenderBase::SetNumEmulatedConnections(num_connections);
   cubic_.SetNumConnections(num_connections_);
+  SetWeight(num_connections_);
+}
+
+void VmafAware::SetWeight(float weight) {
+  TcpCubicSenderBase::SetWeight(weight);
+  cubic_.SetWeight(weight);
 }
 
 void VmafAware::ExitSlowstart() {
@@ -274,8 +280,8 @@ double VmafAware::CwndMultiplier() {
       }
       double risk_window = risk_rate * rtt_stats_->latest_rtt().ToMilliseconds() / 1000.0;
       double risk_weight = past_weight_ * risk_window / congestion_window_; //cwnd is in bytes
-      risk_weight = fmin(risk_weight, 50);
-      
+      risk_weight = fmin(risk_weight/5.0, 10);
+
       if (ss > 0){
         DLOG(INFO) << "chunk remainder is " << client_data_->get_chunk_remainder() << " buffer is " << client_data_->get_buffer_estimate();
         DLOG(INFO) << "rtt is in ms " << rtt_stats_->latest_rtt().ToMilliseconds() << " last window is " << congestion_window_;
@@ -283,8 +289,6 @@ double VmafAware::CwndMultiplier() {
       }
 
       weight = std::max(vmaf_weight, risk_weight);
-      //weight = vmaf_weight;
-      //weight = fmin(risk_weight, 50);
       if (client_data_->get_chunk_index() >= 1) {
           multiplier = weight;
       } else {
@@ -376,6 +380,10 @@ void VmafAware::MaybeIncreaseCwnd(
                   << " slowstart threshold: " << slowstart_threshold_;
     return;
   }
+
+  // uncomment this to run RENO or CUBIC and not FastTCP
+  //SetWeight(CwndMultiplier());
+
   // Congestion avoidance.
   if (reno_) {
     // Classic Reno congestion avoidance.
@@ -392,14 +400,17 @@ void VmafAware::MaybeIncreaseCwnd(
       bandwidth_ests_[bandwidth_ix_] = InstantaneousBandwidth();
       bandwidth_ix_ = (bandwidth_ix_ + 1) % bandwidth_ests_.size(); 
       UpdateCongestionWindow();
+
       //congestion_window_ += (int64_t)(CwndMultiplier() * kDefaultTCPMSS);
+      
+      congestion_window_ += (int64_t)(kDefaultTCPMSS);
       num_acked_packets_ = 0;
     }
     QUIC_DVLOG(1) << "Reno; congestion window: " << congestion_window_
                   << " slowstart threshold: " << slowstart_threshold_
                   << " congestion window count: " << num_acked_packets_;
   } else {
-    cubic_.SetWeight(CwndMultiplier());
+    //cubic_.SetWeight(CwndMultiplier());
     congestion_window_ = std::min(
         max_congestion_window_,
         cubic_.CongestionWindowAfterAck(acked_bytes, congestion_window_,

@@ -44,6 +44,7 @@ class QUIC_EXPORT_PRIVATE VmafAware : public TcpCubicSenderBase {
   void SetFromConfig(const QuicConfig& config,
                      Perspective perspective) override;
   void SetNumEmulatedConnections(int num_connections) override;
+  void SetWeight(float weight);
   void OnConnectionMigration() override;
   QuicByteCount GetCongestionWindow() const override;
   QuicByteCount GetSlowStartThreshold() const override;

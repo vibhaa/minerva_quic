@@ -182,9 +182,11 @@ QuicByteCount PropSSFastTcp::GetSlowStartThreshold() const {
 }
 
 void PropSSFastTcp::UpdateCongestionWindow() {
-    double gamma = 0.7;
+    double gamma = 0.4;
     DLOG(INFO) << "Updating congestion window";
     if (client_data_ != nullptr) {
+        //QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(start_time_);
+        //int epoch = time_elapsed.ToMilliseconds() / 30000;
         double ss = client_data_->get_screen_size();
         double target = 5.0 * ss;
         double minrtt = rtt_stats_->min_rtt().ToMilliseconds();
