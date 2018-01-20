@@ -97,6 +97,10 @@ Video* ClientData::get_video(){
   return & vid_;
 }
 
+std::string ClientData::get_trace_file() {
+  return trace_file_;
+}
+
 QuicWallTime ClientData::get_last_update_time() {
     return last_update_time_;
 }
@@ -113,5 +117,15 @@ void ClientData::set_screen_size(double ss){
                                                               + std::to_string(int(ss)) + ".dat");
   // set vmaf scores also here
 }
+
+void ClientData::set_trace_file(std::string f) {
+  if (trace_file_.length() > 0 ){
+    return;
+  }
+  DLOG(INFO) << "set_trace_file called with argument " << f;
+  trace_file_ = f;
+}
+
+
 
 }  // namespace net

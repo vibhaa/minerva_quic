@@ -158,22 +158,33 @@ void QuicSimpleServerStream::SendResponse() {
 
   // extract buffer and screen size from the path
   string path_string = request_headers_[":path"].as_string();
+  QUIC_DVLOG(0) << "url before is " << path_string;
   auto pos = path_string.find('?');
-  auto screen_pos = path_string.find('&');
+  auto screen_pos = path_string.find("&screen=");
+  auto trace_pos = path_string.find("&trace_file=");
   string buffer = "";
   string screen = "";
-  QUIC_DVLOG(0) << "url before is " << path_string;
+  string trace_file = "";
+
   if (pos != string::npos) {
     if (screen_pos != string::npos) {
-      buffer = path_string.substr(pos + 1 + strlen("buffer="), screen_pos - (pos + 1 + strlen("buffer=")));
-      screen = path_string.substr(screen_pos + 1 + strlen("screen="));
+      buffer = path_string.substr(pos + 1 + strlen("buffer="), \
+                                    screen_pos - (pos + 1 + strlen("buffer=")));
+
+      screen = path_string.substr(screen_pos + 1 + strlen("screen="), \
+                                    trace_pos - (screen_pos + 1 + strlen("screen=")));
+
+      trace_file = path_string.substr(trace_pos + 1 +strlen("trace_file="));
     }
     else {
+      assert(false);
       buffer = path_string.substr(pos + 1 + strlen("buffer="));
     }
     path_string = path_string.substr(0, pos);
   }
-  QUIC_DVLOG(0) << "url is " << path_string << "  buffer is" << buffer << "screen size is" << screen;
+  QUIC_DVLOG(0) << "url is " << path_string << "  buffer is" << buffer << "screen size is" << screen
+                << "trace file is " << trace_file;
+
   string request_url = request_headers_[":authority"].as_string() + path_string;
 
   // update client data with buffer and screen size
@@ -181,6 +192,9 @@ void QuicSimpleServerStream::SendResponse() {
     spdy_session()->get_client_data()->set_buffer_estimate(stod(buffer));
   if (screen.length() > 0)
     spdy_session()->get_client_data()->set_screen_size(stod(screen));
+  if (trace_file.length() > 0) {
+    spdy_session() -> get_client_data() -> set_trace_file(trace_file);
+  }
 
   int response_code;
   const SpdyHeaderBlock& response_headers = response->headers();

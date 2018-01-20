@@ -36,8 +36,10 @@ class QUIC_EXPORT_PRIVATE ClientData {
   QuicTime::Delta get_total_rtt();
   void set_buffer_estimate(double current_buffer);
   void set_screen_size(double ss);
+  void set_trace_file(std::string);
   double get_client_id();
   Video* get_video();
+  std::string get_trace_file();
 
  private:
   double buffer_estimate_;
@@ -54,6 +56,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   QuicByteCount chunk_remainder_;
   QuicWallTime last_update_time_;
   Video vid_;
+  std::string trace_file_;
 };
 
 }  // namespace net

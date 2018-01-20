@@ -243,7 +243,8 @@ double VmafAware::CwndMultiplier() {
     }
      
     // dummy chunk index of -1
-    double qoe = client_data_ -> get_video() -> qoe(client_data_ -> get_chunk_index(), prev_rate / 1e3);
+    double qoe = client_data_ -> get_video() -> qoe(client_data_ -> get_chunk_index(),
+                                                    fmin(prev_rate / 1e3, 10)); // min with 10 Kbps
     DLOG(INFO) << "qoe : " << qoe;
 
     assert (client_data_ != nullptr);
@@ -303,40 +304,41 @@ void VmafAware::MaybeIncreaseCwnd(
     QuicByteCount prior_in_flight,
     QuicTime event_time) {
   
-    std::ofstream bw_log_file;
-    bw_log_file.open("quic_bw_vmaf_aware.log", std::ios::app);
     if (client_data_ != nullptr) {
-      double ss = client_data_->get_screen_size();
+        std::ofstream bw_log_file;
+        assert(client_data_ -> get_trace_file().length() > 0);
+        bw_log_file.open("quic_bw_vmaf_aware_" + client_data_ -> get_trace_file() + ".log", std::ios::app);
+        double ss = client_data_->get_screen_size();
 
-      // log data
-      QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_time_);
-      if (ss > 0 && time_elapsed > rtt_stats_->smoothed_rtt()) { 
-            last_time_ = clock_->WallNow();
-            bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
-                     << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
-                     << ", \"clientId\": " << client_data_->get_client_id()
-                     << ", \"bandwidth_Mbps\": " << client_data_->get_rate_estimate().ToKBitsPerSecond()/1000.0
-                     << ", \"total throughput\": "<< client_data_->get_throughput()
-                     << ", \"congestion_window\": "<< congestion_window_
-                     << ", \"screen_size\": " << ss
-                     << ", \"multiplier\": " << log_multiplier
-                     << ", \"prev_rate\": " << log_prev_rate
-                     << ", \"past_weight\": " << past_weight_
-                     << ", \"accum_acked_bytes\": " << accum_acked_bytes
-                     << "}\n";
-      }
+        // log data
+        QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_time_);
+        if (ss > 0 && time_elapsed > rtt_stats_->smoothed_rtt()) { 
+        last_time_ = clock_->WallNow();
+        bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
+                 << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
+                 << ", \"clientId\": " << client_data_->get_client_id()
+                 << ", \"bandwidth_Mbps\": " << client_data_->get_rate_estimate().ToKBitsPerSecond()/1000.0
+                 << ", \"total throughput\": "<< client_data_->get_throughput()
+                 << ", \"congestion_window\": "<< congestion_window_
+                 << ", \"screen_size\": " << ss
+                 << ", \"multiplier\": " << log_multiplier
+                 << ", \"prev_rate\": " << log_prev_rate
+                 << ", \"past_weight\": " << past_weight_
+                 << ", \"accum_acked_bytes\": " << accum_acked_bytes
+                 << "}\n";
+        }
 
-      client_data_->update_chunk_remainder(acked_bytes);
-      accum_acked_bytes += acked_bytes;
-      assert(acked_bytes >= 0);
+        client_data_->update_chunk_remainder(acked_bytes);
+        accum_acked_bytes += acked_bytes;
+        assert(acked_bytes >= 0);
         // This is how we tell if we got a new chunk request.
-      if (client_data_->get_buffer_estimate() != cur_buffer_estimate_) {
-          DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<
-              LongTermBandwidthEstimate().ToDebugValue();
-          cur_buffer_estimate_ = client_data_->get_buffer_estimate();
-      }
+        if (client_data_->get_buffer_estimate() != cur_buffer_estimate_) {
+        DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<
+          LongTermBandwidthEstimate().ToDebugValue();
+        cur_buffer_estimate_ = client_data_->get_buffer_estimate();
+        }
+        bw_log_file.close();
     }
-    bw_log_file.close();
 
   QUIC_BUG_IF(InRecovery()) << "Never increase the CWND during recovery.";
   // Do not increase the congestion window unless the sender is close to using

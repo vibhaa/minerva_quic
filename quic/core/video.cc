@@ -65,10 +65,12 @@ void Video::set_video_file(std::string fname) {
 }
 
 double Video::qoe(int __chunk_ix, double rate) { // rate in Kbps
-	DLOG(INFO) << "size of bitrates_: " << bitrates_.size();
-	rate = fmax(rate, bitrates_[0]);
 
-	return 20.0 - 20.0 * exp(-3.0 * rate / ss_ / 4300.0);
+	assert(rate >= 0);
+
+	double qoe = 20.0 - 20.0 * exp(-3.0 * rate / ss_ / 4300.0);
+
+	return qoe;
 }
 
 double Video::vmaf_qoe(int chunk_ix, double rate) {
