@@ -1,0 +1,34 @@
+HTTP/1.0 200 OK
+Server: SimpleHTTP/0.6 Python/2.7.13
+Date: Sat, 20 Jan 2018 20:33:49 GMT
+Content-type: application/octet-stream
+Content-Length: 2499
+Last-Modified: Fri, 19 Jan 2018 21:07:44 GMT
+
+<?xml version="1.0" encoding="utf-8"?>
+<MPD xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns="urn:mpeg:dash:schema:mpd:2011"
+	xmlns:xlink="http://www.w3.org/1999/xlink"
+	xsi:schemaLocation="urn:mpeg:DASH:schema:MPD:2011 http://standards.iso.org/ittf/PubliclyAvailableStandards/MPEG-DASH_schema_files/DASH-MPD.xsd"
+	profiles="urn:mpeg:dash:profile:isoff-live:2011"
+	type="static"
+	mediaPresentationDuration="PT6.0S"
+	minBufferTime="PT4.0S">
+	<ProgramInformation>
+	</ProgramInformation>
+	<Period start="PT0.0S">
+		<AdaptationSet mimeType="video/mp4" segmentAlignment="true" bitstreamSwitching="true">
+            		<SegmentTemplate timescale="1000000" initialization="$RepresentationID$/Header.m4s" media="$RepresentationID$/$Number$.m4s" startNumber="1" duration="4000000" />
+			<Representation id="BigBuckBunny_80_720_4250" codecs="avc1.f4001f" bandwidth="4250000" width="1280" height="720" frameRate="25/1" sar="1:1" scanType="progressive"/>
+			<Representation id="BigBuckBunny_95_1080_5800" codecs="avc1.f40028" bandwidth="5800000" width="1920" height="1080" frameRate="25/1" sar="1:1" scanType="progressive"/>
+			<Representation id="BigBuckBunny_50_480_1050" codecs="avc1.f4001e" bandwidth="1050000" width="640" height="480" frameRate="25/1" sar="1:1" scanType="progressive"/>
+			<Representation id="BigBuckBunny_75_720_3050" codecs="avc1.f4001f" bandwidth="3050000" width="1280" height="720" frameRate="25/1" sar="1:1" scanType="progressive"/>
+			<Representation id="BigBuckBunny_40_384_750" codecs="avc1.f40015" bandwidth="750000" width="512" height="384" frameRate="25/1" sar="1:1" scanType="progressive"/>
+			<Representation id="BigBuckBunny_55_480_1750" codecs="avc1.f4001e" bandwidth="1750000" width="640" height="480" frameRate="25/1" sar="1:1" scanType="progressive"/>
+			<Representation id="BigBuckBunny_90_1080_4300" codecs="avc1.f40028" bandwidth="4300000" width="1920" height="1080" frameRate="25/1" sar="1:1" scanType="progressive"/>
+			<Representation id="BigBuckBunny_20_288_375" codecs="avc1.f40015" bandwidth="375000" width="384" height="288" frameRate="25/1" sar="1:1" scanType="progressive"/>
+			<Representation id="BigBuckBunny_30_384_550" codecs="avc1.f40015" bandwidth="550000" width="512" height="384" frameRate="25/1" sar="1:1" scanType="progressive"/>
+			<Representation id="BigBuckBunny_85_1080_3800" codecs="avc1.f40028" bandwidth="3800000" width="1920" height="1080" frameRate="25/1" sar="1:1" scanType="progressive"/>
+		</AdaptationSet>
+	</Period>
+</MPD>
