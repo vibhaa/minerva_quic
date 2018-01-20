@@ -255,7 +255,7 @@ double VmafAware::CwndMultiplier() {
       double risk_rate = 0;
       double buf_est = client_data_->get_buffer_estimate();
       if (buf_est > 0) {
-          risk_rate = client_data_->get_chunk_remainder() / buf_est; // TODO: prevent o division error
+          risk_rate = 8 * client_data_->get_chunk_remainder() / buf_est; // TODO: prevent division error
       }
       
       double risk_weight = risk_rate / prev_rate * past_weight_;
