@@ -3,7 +3,7 @@ Server: SimpleHTTP/0.6 Python/2.7.13
 Date: Sat, 20 Jan 2018 20:33:49 GMT
 Content-type: application/octet-stream
 Content-Length: 2499
-Last-Modified: Fri, 19 Jan 2018 21:07:44 GMT
+X-Original-URL: https://www.example3.org/BigBuckBunny/Manifest.mpd
 
 <?xml version="1.0" encoding="utf-8"?>
 <MPD xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
