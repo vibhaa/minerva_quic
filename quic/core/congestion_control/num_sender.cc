@@ -192,10 +192,12 @@ void NumSender::UpdateCongestionWindow() {
         double rtt = rtt_stats_->latest_rtt().ToMilliseconds();
         double rttmin = rtt_stats_->min_rtt().ToMilliseconds();
         double rate_kbps = congestion_window_ / rtt;
-        double target = rtt/c * log( (c + rtt*a)/(a * (rtt - minrtt) + rtt * a * exp(-c*rate_kbps)));
-        congestion_window_ = (int)((1 - gamma) * congestion_window_ + gamma * target);
+        double target = rtt/c * log( (c + rtt*a)/(a * (rtt - rttmin) + rttmin * a * exp(-c*rate_kbps)));
+        double scaled = fmin(target / 100000.0, 1.0) * 20;
+        
+        congestion_window_ = (int)((1 - gamma) * congestion_window_ + gamma * scaled);
         DLOG(INFO) << "Updating congestion window for ss " << client_data_->get_screen_size()
-            << " target " << target;
+            << " target " << target
             << " new window " << congestion_window_;
     }
 }
