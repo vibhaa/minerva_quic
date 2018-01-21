@@ -74,6 +74,8 @@ class QuicSimpleServerStream : public QuicSpdyServerStreamBase {
 
   const std::string& body() { return body_; }
 
+  void ParseClientParams(std::string path_string);
+
  private:
   friend class test::QuicSimpleServerStreamPeer;
 
