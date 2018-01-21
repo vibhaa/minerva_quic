@@ -26,10 +26,10 @@ If you make any changes to the code, run the following command to recompile:
 ninja -C out/Debug quic_server quic_client
 ```
 
-To run the quic server:
+To run the quic server to serve a certain set of video files in `/tmp/quic-data/www.example3.org/video_file_dir` :
 ```
 ./out/Debug/quic_server \
---quic_response_cache_dir=/tmp/quic-data/www.example3.org \
+--quic_response_cache_dir=/tmp/quic-data/www.example3.org/video_file_dir \
 --certificate_file=net/tools/quic/certs/out/leaf_cert.pem \
 --key_file=net/tools/quic/certs/out/leaf_cert.pkcs8
 ```
@@ -52,15 +52,16 @@ cd ~/video_transport_simulator/implementation/rl_server/
 python mpc_server.py
 ```
 
-To just get logs for the requested video without viewing it, 
+To just get logs for the requested BigBuckBunny video without viewing it, 
 replace privateip with the private ip of the instance you are running the client on and run:
 ```
 cd ~/video_transport_simulator/implementation/run_exp/
-python run_video.py privateip fastMPC 10 2 blah 5
+python run_traces.py --name=vmaf_bugs_1_2 --trace ../../traces/norway/norwaysmall/hsdpa-tcp-logs_ferry.nesoddtangen-oslo_report.2010-09-29_0702CEST.log_0_0.6_10.0_0.6_10.0 --time=50 --screen-sizes 1 --mahimahi-log-dir fastTCP_mahimahi --bw-per-client 1.5 --quic-response-cache-dir BigBuckBunny
 ``` 
-which runs the video for 10 seconds
+which runs the video for 10 seconds. To watch a different video, just change the `--quic-response-cache-dir` after ensuring that that corresponding directory exists in `/tmp/quic-data/www.example3.org/`
 
-To get logs for a number of network traces, by running the quic server and a chrome client on different sides of a mahimahi link:
+To get logs for a number of network traces, by running the quic server serving the BigBuckBunny video and a chrome client on different sides of a mahimahi link:
 ```
-python run_traces.py ../cooked_traces/ fastMPC 2 privateip
+python run_traces.py --name=vmaf_bugs_1_2 --trace-dir ../../traces/norway/norwaysmall/ --time=50 --screen-sizes 1 --mahimahi-log-dir fastTCP_mahimahi --bw-per-client 1.5 --quic-response-cache-dir BigBuckBunny
+
 ```
