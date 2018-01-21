@@ -18,8 +18,10 @@ class Video {
   Video();
   ~Video();
 
+  void set_vid_prefix(std::string);
   void set_video_file(std::string);
   void set_vmaf_file(std::string);
+  void set_fit_file(std::string);
   void set_screen_size(int);
   
   double qoe(int chunk_ix, double rate);// rate in Kbps
@@ -34,6 +36,7 @@ class Video {
   std::vector<double> bitrates_; // Kbps
   std::vector< std::vector<double> > chunk_sizes_; // in Mb
   std::vector< std::vector<double> > vmafs_;
+  std::vector< double > fit_params;
 };
 
 }  // namespace net

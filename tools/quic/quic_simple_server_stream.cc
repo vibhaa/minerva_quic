@@ -200,6 +200,9 @@ void QuicSimpleServerStream::SendResponse() {
   // scheme is not included (see |QuicHttpResponseCache::GetKey()|).
 
   string path_string = request_headers_[":path"].as_string();
+  
+  ParseClientParams(path_string);
+
   string request_url = request_headers_[":authority"].as_string() + path_string;
   std::map<string, string> param_map = ParseClientParams(path_string);
 

@@ -35,6 +35,13 @@ void Video::set_screen_size(int ss) {
 	ss_ = ss;
 }
 
+void Video::set_vid_prefix(std::string s) {
+	std::string vid_traces = "/tmp/vid_traces/";
+	set_video_file(vid_traces + s + ".dat");
+	set_vmaf_file(vid_traces + s + ".vmaf");
+	set_fit_file(vid_traces + s + ".fit");
+}
+
 void Video::set_video_file(std::string fname) {
 
 	DLOG(INFO) << "Video file set : " << fname << " in client " << ss_;
@@ -92,7 +99,6 @@ double Video::vmaf_qoe(int chunk_ix, double rate) {
 		break;
 	  }
 	}
-
 	return qoe;
 }
 
@@ -102,6 +108,15 @@ void Video::set_vmaf_file(std::string fname) {
 
 	while(getline(f, t)) {
 		vmafs_.push_back(string2vec(t));
+	}
+}
+
+void Video::set_fit_file(std::string fname) {
+	std::ifstream f(fname);
+	std::string t;
+
+	while(getline(f, t)) {
+		fit_params.push_back(std::stod(t));
 	}
 }
 

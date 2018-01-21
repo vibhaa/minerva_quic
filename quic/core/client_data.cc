@@ -98,7 +98,13 @@ Video* ClientData::get_video(){
   return & vid_;
 }
 
+std::string ClientData::get_vid_prefix() {
+  assert(vid_prefix_.length() > 0);
+  return vid_prefix_;
+}
+
 std::string ClientData::get_trace_file() {
+  assert(trace_file_.length() > 0);
   return trace_file_;
 }
 
@@ -110,8 +116,6 @@ void ClientData::set_buffer_estimate(double current_buffer){
 void ClientData::set_screen_size(double ss){
 	screen_size_ = ss;
   vid_.set_screen_size(ss);
-  vid_.set_video_file("/home/ubuntu/video_transport_simulator/video_traces/video_trace_"
-                                                              + std::to_string(int(ss)) + ".dat");
   // set vmaf scores also here
 }
 
@@ -161,6 +165,15 @@ int ClientData::prev_bitrate() {
         return bitrates_[bitrates_.size()-2];
     }
     return current_bitrate();
+  }
+
+void ClientData::set_vid_prefix(std::string f) {
+  if (vid_prefix_.length() > 0 ){
+    return;
+  }
+  DLOG(INFO) << "set_vid_prefix called with argument " << f;
+  vid_prefix_ = f;
+  vid_.set_vid_prefix(vid_prefix_);
 }
 
 }  // namespace net

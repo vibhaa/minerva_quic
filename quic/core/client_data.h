@@ -39,6 +39,8 @@ class QUIC_EXPORT_PRIVATE ClientData {
   double get_client_id();
   Video* get_video();
   std::string get_trace_file();
+  std::string get_vid_prefix();
+  void set_vid_prefix(std::string);
 
   ValueFunc* get_value_func();
   // Load the value function from a file.
@@ -84,6 +86,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   std::string trace_file_;
   ValueFunc value_func_;
   std::vector<int> bitrates_;
+  std::string vid_prefix_;
 };
 
 }  // namespace net

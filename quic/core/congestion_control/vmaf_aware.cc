@@ -221,58 +221,44 @@ QuicByteCount VmafAware::GetSlowStartThreshold() const {
 }
 
 double VmafAware::CwndMultiplier() {
-
     double weight = 1.0;
-    const int num_bitrates = 6;
-    double qoes[][num_bitrates] = {{3.77, 8.15, 11.34, 14.49, 17.26, 19.0}, {1.987, 4.6, 6.84, 9.51, 12.59, 15.53}};
-    double br[num_bitrates] = {300.0, 750.0, 1200.0, 1850.0, 2850.0, 4300.0}; // in Kbps
     int ss = client_data_ -> get_screen_size();
-    int idx = ss - 1;
-    assert( idx == 0 || idx == 1);
-    
-    DLOG(INFO) << "Index : " << idx;
     
     QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_weight_update_time_);
-
     double prev_rate = 8 * accum_acked_bytes / ((time_elapsed.ToMilliseconds()) / 1000.0); // units : bps
 
     DLOG(INFO) << "prev_rate is " << prev_rate;
-
-    for (int i = 0; i < num_bitrates; ++i) {
-      br[i] = 1000.0 * br[i];
-    }
      
-    // dummy chunk index of -1
     double qoe = client_data_ -> get_video() -> qoe(client_data_ -> get_chunk_index(),
-                                                    fmin(prev_rate / 1e3, 10)); // min with 10 Kbps
+                                                        fmin(prev_rate / 1e3, 10)); // min with 10 Kbps
     DLOG(INFO) << "qoe : " << qoe;
 
-    assert (client_data_ != nullptr);
+    double vmaf_weight = (prev_rate / qoe) * 3.77 / 300.0; //cwnd is in bytes
 
-      double vmaf_weight = (prev_rate / qoe) * (qoes[0][0] / br[0]); //cwnd is in bytes
+    // risk calculation
+    double risk_rate = 0;
+    double buf_est = client_data_->get_buffer_estimate();
+    if (buf_est > 0) {
+      risk_rate = 8 * client_data_->get_chunk_remainder() / buf_est; // TODO: prevent division error
+    }
 
-      // risk calculation
-      double risk_rate = 0;
-      double buf_est = client_data_->get_buffer_estimate();
-      if (buf_est > 0) {
-          risk_rate = 8 * client_data_->get_chunk_remainder() / buf_est; // TODO: prevent division error
-      }
-      
-      double risk_weight = risk_rate / prev_rate * past_weight_;
-      
-      if (ss > 0){
-        DLOG(INFO) << "chunk remainder is " << client_data_->get_chunk_remainder() << " buffer is " << client_data_->get_buffer_estimate();
-        DLOG(INFO) << "rtt is in ms " << rtt_stats_->latest_rtt().ToMilliseconds() << " last window is " << congestion_window_;
+    double risk_weight = risk_rate / prev_rate * past_weight_;
+
+    if (ss > 0){
+        DLOG(INFO) << "chunk remainder is " << client_data_->get_chunk_remainder() << " (in Bytes). Buffer is " 
+                                                                            << client_data_->get_buffer_estimate();
+        DLOG(INFO) << "rtt is in ms " << rtt_stats_->latest_rtt().ToMilliseconds() << " last window is "
+                                                                     << congestion_window_;
         DLOG(INFO) << "risk weight is " << risk_weight << " screen size is " << ss << "vmaf weight is" << vmaf_weight;
-      }
+    }
 
      weight = std::max(vmaf_weight, risk_weight);
 
-     weight = fmin(weight, sqrt(50));
-  
-     if (client_data_->get_chunk_index() < 1) weight = ss;
-        
-    assert(weight > 0);
+    if (client_data_->get_chunk_index() < 1) weight = 1.0;
+     
+     weight = fmin(weight, 5);
+
+     assert(weight > 0);
 
     const double MILLI_SECONDS_LAG = 500;
 
@@ -306,7 +292,6 @@ void VmafAware::MaybeIncreaseCwnd(
   
     if (client_data_ != nullptr) {
         std::ofstream bw_log_file;
-        assert(client_data_ -> get_trace_file().length() > 0);
         bw_log_file.open("quic_bw_vmaf_aware_" + client_data_ -> get_trace_file() + ".log", std::ios::app);
         double ss = client_data_->get_screen_size();
 
@@ -359,7 +344,7 @@ void VmafAware::MaybeIncreaseCwnd(
   }
 
   // uncomment this to run RENO or CUBIC and not FastTCP
-  //SetWeight(CwndMultiplier());
+  SetWeight(CwndMultiplier());
 
   // Congestion avoidance.
   if (reno_) {
@@ -378,14 +363,15 @@ void VmafAware::MaybeIncreaseCwnd(
       bandwidth_ix_ = (bandwidth_ix_ + 1) % bandwidth_ests_.size();
       
       congestion_window_ += (int64_t)(kDefaultTCPMSS);
-      UpdateCongestionWindow();
+      // Uncomment below line to run FastTCP
+      // UpdateCongestionWindow();
       num_acked_packets_ = 0;
     }
     QUIC_DVLOG(1) << "Reno; congestion window: " << congestion_window_
                   << " slowstart threshold: " << slowstart_threshold_
                   << " congestion window count: " << num_acked_packets_;
   } else {
-    //cubic_.SetWeight(CwndMultiplier());
+    cubic_.SetWeight(CwndMultiplier());
     congestion_window_ = std::min(
         max_congestion_window_,
         cubic_.CongestionWindowAfterAck(acked_bytes, congestion_window_,
