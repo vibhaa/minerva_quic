@@ -7,6 +7,8 @@
 #include <map>
 #include <vector>
 
+#include "net/quic/platform/api/quic_logging.h"
+
 using namespace std;
 
 namespace net {
@@ -47,7 +49,7 @@ vector<double> ValueFunc::ParseArray(ifstream *file) {
     istringstream iss(line);
     string name;
     iss >> name;
-    cout << "Parsing " << name << endl;
+    DLOG(INFO) << "Parsing " << name;
     int len;
     iss >> len;
     vector<double> arr(len, 0);
@@ -61,7 +63,7 @@ vector<double> ValueFunc::ParseArray(ifstream *file) {
         arr[i++] = next_val;
     }
     if (arr.size() != (size_t)len) {
-        cout << "ERROR: array length mismatch";
+        DLOG(ERROR) << "ERROR: array length mismatch";
     }
     return arr;
 }
@@ -69,7 +71,7 @@ vector<double> ValueFunc::ParseArray(ifstream *file) {
 void ValueFunc::ParseFrom(const string& filename) {
     ifstream file(filename);
     if (!file.is_open()) {
-        cout << "ERROR: Invalid value function file";
+        DLOG(ERROR) << "ERROR: Invalid value function file";
         return;
     }
 
@@ -79,6 +81,7 @@ void ValueFunc::ParseFrom(const string& filename) {
     buffers_ = ParseArray(&file);
     vector<double> bitrates_fl = ParseArray(&file);
     // Fill the bitrates inverse map;
+    bitrates_.resize(bitrates_fl.size());
     for (size_t i = 0; i < bitrates_.size(); i++) {
         bitrates_[i] = (int)bitrates_fl[i];
         br_inverse_[bitrates_[i]] = i;
@@ -102,6 +105,9 @@ void ValueFunc::ParseFrom(const string& filename) {
             }
         }
     }
+    DLOG(INFO) << "Value func loaded. Size = ("
+        << values_.size() << " " << values_[0].size()
+        << " " << values_[0][0].size() << ")";
 }
 
 }  // namespace net

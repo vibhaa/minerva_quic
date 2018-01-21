@@ -130,6 +130,7 @@ void ClientData::set_trace_file(std::string f) {
 }
 
 void ClientData::load_value_function(const std::string& filename) {
+    DLOG(INFO) << "Setting value function from " << filename;
     value_func_ = ValueFunc(filename);
 }
 

@@ -56,7 +56,6 @@ void Video::set_video_file(std::string fname) {
 		
 		for (unsigned int i = 0; i < chunk_sizes_[n].size(); ++i ){
 			chunk_sizes_[n][i] = chunk_sizes_[n][i] * 8.0 / 1e6;
-			DLOG(INFO) << i << " " << chunk_sizes_[n][i];
 		}
 	}
 
