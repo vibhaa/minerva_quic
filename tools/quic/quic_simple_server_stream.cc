@@ -109,6 +109,7 @@ void QuicSimpleServerStream::ParseClientParams(string path_string) {
   // extract buffer and screen size from the path
   auto pos = path_string.find('?');
   if (pos == std::string::npos) {
+    DLOG(INFO) << "no params";
     return;
   }
   std::istringstream iss(path_string.substr(pos+1));
@@ -134,6 +135,8 @@ void QuicSimpleServerStream::ParseClientParams(string path_string) {
   if (trace_file.length() > 0) {
     spdy_session() -> get_client_data() -> set_trace_file(trace_file);
   }
+
+  //spdy_session()->get_client_data()->load_value_function("/home/ubuntu/test_out.vf");
 
 }
 

@@ -10,8 +10,10 @@
 #include "net/quic/core/quic_bandwidth.h"
 #include "net/quic/core/quic_time.h"
 #include "net/quic/platform/api/quic_clock.h"
+#include "net/quic/platform/api/quic_export.h"
 #include "net/quic/core/quic_time.h"
 #include "net/quic/core/video.h"
+#include "net/quic/core/value_func.h"
 
 namespace net {
 
@@ -41,12 +43,18 @@ class QUIC_EXPORT_PRIVATE ClientData {
   Video* get_video();
   std::string get_trace_file();
 
+  // Load the value function from a file.
+  void load_value_function(const std::string& file);
+  // Use the value function to obtain the value for. 
+  double value_for(double rate, double buf, int bitrate);
+
  private:
   double buffer_estimate_;
   double screen_size_;
   double client_id_;
   int chunk_index_;
   const QuicClock* clock_;
+  
   QuicByteCount total_throughput_;
   QuicBandwidth last_bw_;
   QuicWallTime initial_time_;
@@ -57,6 +65,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   QuicWallTime last_update_time_;
   Video vid_;
   std::string trace_file_;
+  ValueFunc value_func_;
 };
 
 }  // namespace net

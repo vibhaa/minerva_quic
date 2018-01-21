@@ -1,10 +1,12 @@
 // NOT part of Chromium's copyright.
 
-#include "net/quic/core/client_data.h"
-#include "net/quic/platform/api/quic_clock.h"
-#include "net/quic/platform/api/quic_logging.h"
 #include <stdlib.h>
 #include <string>
+
+#include "net/quic/core/client_data.h"
+
+#include "net/quic/platform/api/quic_clock.h"
+#include "net/quic/platform/api/quic_logging.h"
 
 namespace net {
 
@@ -21,7 +23,8 @@ ClientData::ClientData(const QuicClock* clock)
       bytes_since_last_measurement_(0),
       total_rtt_(QuicTime::Delta::Zero()),
       chunk_remainder_(0),
-      last_update_time_(QuicWallTime::Zero()){}
+      last_update_time_(QuicWallTime::Zero()),
+      value_func_() {}
 
 ClientData::~ClientData() {}
 
@@ -126,6 +129,12 @@ void ClientData::set_trace_file(std::string f) {
   trace_file_ = f;
 }
 
+void ClientData::load_value_function(const std::string& filename) {
+    value_func_ = ValueFunc(filename);
+}
 
+double ClientData::value_for(double rate, double buf, int br) {
+    return value_func_.ValueFor(rate, buf, br);
+}
 
 }  // namespace net
