@@ -2,8 +2,7 @@ HTTP/1.0 200 OK
 Server: cloudflare-quic
 Date: Wed, 08 Nov 2017 21:19:57 GMT
 Content-type: text/html
-Content-Length: 1504
-X-Original-URL: https://www.example3.org/BigBuckBunny/myindex_fastMPC.html
+Content-Length: 1503
 
 <!doctype html>
 <html>
@@ -14,14 +13,14 @@ X-Original-URL: https://www.example3.org/BigBuckBunny/myindex_fastMPC.html
         <div>
             <video id="videoPlayer" controls="true"></video>
         </div>
-	<script src="dashHttps.all.min.js"></script>
+	<script src="dash.all.min.js"></script>
         <script>
             (function(){
                 var url = "/Manifest.mpd";
                 var player = dashjs.MediaPlayer().create()
 
-                var abr_algorithms = {0: 'Default', 1: 'Fixed Rate (0)', 2: 'Buffer Based', 3: 'Rate Based', 4: 'MPC', 5: 'Festive', 6: 'Bola'};
-                var abr_id = 4;
+                var abr_algorithms = {0: 'Default', 1: 'Fixed Rate (0)', 2: 'Buffer Based', 3: 'Rate Based', 4: 'RL', 5: 'Festive', 6: 'Bola'};
+                var abr_id = 6;
 
                 if ( abr_id > 1 && abr_id != 6 ) {
                     player.enablerlABR(true);
@@ -48,5 +47,4 @@ X-Original-URL: https://www.example3.org/BigBuckBunny/myindex_fastMPC.html
             })();
         </script>
     </body>
-    			player.setVideoFile('BigBuckBunny')
 </html>
