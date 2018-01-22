@@ -6,6 +6,7 @@
 #define NET_TOOLS_QUIC_QUIC_SIMPLE_SERVER_STREAM_H_
 
 #include <string>
+#include <map>
 
 #include "base/macros.h"
 #include "net/quic/core/quic_packets.h"
@@ -14,6 +15,8 @@
 #include "net/spdy/core/spdy_framer.h"
 #include "net/tools/quic/quic_http_response_cache.h"
 #include "net/tools/quic/quic_spdy_server_stream_base.h"
+
+using std::string;
 
 namespace net {
 
@@ -74,7 +77,7 @@ class QuicSimpleServerStream : public QuicSpdyServerStreamBase {
 
   const std::string& body() { return body_; }
 
-  void ParseClientParams(std::string path_string);
+  std::map<string, string> ParseClientParams(std::string path_string);
 
  private:
   friend class test::QuicSimpleServerStreamPeer;

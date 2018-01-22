@@ -22,6 +22,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   ClientData(const QuicClock* clock);
   ~ClientData();
 
+  void new_chunk(int bitrate, QuicByteCount chunk_size);
   void reset_chunk_remainder(QuicByteCount x);
   void update_chunk_remainder(QuicByteCount x);
   QuicByteCount get_chunk_remainder();
@@ -70,6 +71,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   Video vid_;
   std::string trace_file_;
   ValueFunc value_func_;
+  std::vector<int> bitrates_;
 };
 
 }  // namespace net

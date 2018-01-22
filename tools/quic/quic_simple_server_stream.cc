@@ -105,15 +105,15 @@ void QuicSimpleServerStream::PushResponse(
   QuicSpdyStream::OnInitialHeadersComplete(/*fin=*/true, 0, QuicHeaderList());
 }
 
-void QuicSimpleServerStream::ParseClientParams(string path_string) {
+std::map<string, string> QuicSimpleServerStream::ParseClientParams(string path_string) {
   // extract buffer and screen size from the path
+  std::map<string, string> param_map;
   auto pos = path_string.find('?');
   if (pos == std::string::npos) {
     DLOG(INFO) << "no params";
-    return;
+    return param_map;
   }
   std::istringstream iss(path_string.substr(pos+1));
-  std::map<string, string> param_map;
   string token;
   while(std::getline(iss, token, '&')) {
     int eq = token.find('=');
@@ -123,24 +123,30 @@ void QuicSimpleServerStream::ParseClientParams(string path_string) {
     DLOG(INFO) << "Got arg " << key << " = " << val;
   }
 
+  // Fill as many as we can here and return the param map for later code.
   string buffer = param_map["buffer"];
   string screen = param_map["screen"];
   string trace_file = param_map["trace_file"];
   string value_func = param_map["value_func"];
+  string past_qoe = param_map["qoe"];
+  string bitrate = param_map["bitrate"];  
   QUIC_DVLOG(0) << "url is " << path_string << "  buffer is" << buffer << "screen size is" << screen;
 
+  ClientData *cdata = spdy_session()->get_client_data();
   // update client data with buffer and screen size
   if (buffer.length() > 0)
-    spdy_session()->get_client_data()->set_buffer_estimate(stod(buffer));
+    cdata->set_buffer_estimate(stod(buffer));
   if (screen.length() > 0)
-    spdy_session()->get_client_data()->set_screen_size(stod(screen));
-  if (trace_file.length() > 0) {
-    spdy_session() -> get_client_data() -> set_trace_file(trace_file);
-  }
+    cdata->set_screen_size(stod(screen));
+  if (trace_file.length() > 0)
+    cdata->set_trace_file(trace_file);
+  if (past_qoe.length() > 0)
+    cdata->set_past_qoe(stod(past_qoe));
   if (value_func.length() > 0) {
     string vf_dir = "/home/ubuntu/value_funcs/";
-    spdy_session()->get_client_data()->load_value_function(vf_dir + value_func);
+    cdata->load_value_function(vf_dir + value_func);
   }
+  return param_map;
 }
 
 void QuicSimpleServerStream::SendResponse() {
@@ -195,8 +201,8 @@ void QuicSimpleServerStream::SendResponse() {
   // scheme is not included (see |QuicHttpResponseCache::GetKey()|).
 
   string path_string = request_headers_[":path"].as_string();
-  ParseClientParams(path_string);
   string request_url = request_headers_[":authority"].as_string() + path_string;
+  std::map<string, string> param_map = ParseClientParams(path_string);
 
   int response_code;
   const SpdyHeaderBlock& response_headers = response->headers();
@@ -216,9 +222,13 @@ void QuicSimpleServerStream::SendResponse() {
 
   if (request_url.find(".m4s") != string::npos) {
     uint64_t chunk_len = 0;
+    int bitrate = 0;
+    if (param_map["bitrate"].length() > 0) {
+        bitrate = stoi(param_map["bitrate"]);
+    }
     QuicTextUtils::StringToUint64(response_headers.find("content-length")->second, &chunk_len);
     QUIC_DVLOG(0) << "chunk length is" << chunk_len;
-    spdy_session()->get_client_data()->reset_chunk_remainder(chunk_len);  
+    spdy_session()->get_client_data()->new_chunk(bitrate, chunk_len);  
   }
 
   if (id() % 2 == 0) {

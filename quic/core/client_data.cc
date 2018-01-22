@@ -23,13 +23,19 @@ ClientData::ClientData(const QuicClock* clock)
       bytes_since_last_measurement_(0),
       bw_measurement_interval_(QuicTime::Delta::Zero()),
       last_buffer_update_time_(QuicWallTime::Zero()),
-      value_func_() {}
+      value_func_(),
+      bitrates_() {}
 
 ClientData::~ClientData() {}
 
+void ClientData::new_chunk(int bitrate, QuicByteCount chunk_size) {
+    bitrates_.push_back(bitrate);
+    chunk_index_++;
+    reset_chunk_remainder(chunk_size);
+}
+
 void ClientData::reset_chunk_remainder(QuicByteCount x) {
     chunk_remainder_ = (int64_t)x;
-    chunk_index_++;
     last_measurement_time_ = clock_->WallNow();
     bytes_since_last_measurement_ = 0;
 }
