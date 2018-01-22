@@ -3,7 +3,7 @@ Server: cloudflare-quic
 Date: Wed, 08 Nov 2017 21:19:58 GMT
 Content-type: text/plain
 Content-Length: 149
-X-Original-Url: http://www.example3.org/video3/sizes.py
+X-Original-URL: https://www.example3.org/BodyPaint/video3/sizes.py
 
 import os, sys
 
