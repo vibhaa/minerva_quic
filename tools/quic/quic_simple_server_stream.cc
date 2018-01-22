@@ -126,6 +126,7 @@ void QuicSimpleServerStream::ParseClientParams(string path_string) {
   string buffer = param_map["buffer"];
   string screen = param_map["screen"];
   string trace_file = param_map["trace_file"];
+  string value_func = param_map["value_func"];
   QUIC_DVLOG(0) << "url is " << path_string << "  buffer is" << buffer << "screen size is" << screen;
 
   // update client data with buffer and screen size
@@ -136,10 +137,10 @@ void QuicSimpleServerStream::ParseClientParams(string path_string) {
   if (trace_file.length() > 0) {
     spdy_session() -> get_client_data() -> set_trace_file(trace_file);
   }
-
-  // This is just a placeholder for when we pass in the value function.
-  //spdy_session()->get_client_data()->load_value_function("/home/ubuntu/test_out.vf");
-
+  if (value_func.length() > 0) {
+    string vf_dir = "/home/ubuntu/value_funcs/";
+    spdy_session()->get_client_data()->load_value_function(vf_dir + value_func);
+  }
 }
 
 void QuicSimpleServerStream::SendResponse() {
