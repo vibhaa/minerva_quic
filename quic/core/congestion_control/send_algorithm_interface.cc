@@ -10,6 +10,7 @@
 #include "net/quic/core/congestion_control/prop_ss_bbr_sender.h"
 #include "net/quic/core/congestion_control/vmaf_aware.h"
 #include "net/quic/core/congestion_control/prop_ss_fast_tcp.h"
+#include "net/quic/core/congestion_control/value_func_aware.h"
 #include "net/quic/core/congestion_control/num_sender.h"
 #include "net/quic/core/client_data.h"
 #include "net/quic/core/quic_packets.h"
@@ -34,7 +35,7 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
   QuicPacketCount max_congestion_window = kDefaultMaxCongestionWindowPackets;
 
   // Hardcode our choice of congestion control :O
-  congestion_control_type = kPropSSFast;
+  congestion_control_type = kValueFunc;
   switch (congestion_control_type) {
     case kBBR:
       DLOG(INFO) << "Congestion control type is BBR";
@@ -94,6 +95,11 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
       return new PropSSFastTcp(
               clock, rtt_stats, initial_congestion_window,
               max_congestion_window, stats);
+    case kValueFunc:
+      DLOG(INFO) << "Congestion control type is ValueFuncAware";
+      return new ValueFuncAware(
+              clock, rtt_stats, initial_congestion_window,
+              max_congestion_window, stats, true);
     case kNUM:
       DLOG(INFO) << "Congestion control type is NUM";
       return new NumSender(

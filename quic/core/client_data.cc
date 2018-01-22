@@ -16,25 +16,28 @@ ClientData::ClientData(const QuicClock* clock)
       client_id_(rand() % 10000 + 1),
       chunk_index_(-1),
       clock_(clock),
-      total_throughput_(0),
+      past_qoe_(0.0),
+      chunk_remainder_(0),
       last_bw_(QuicBandwidth::Zero()),
-      initial_time_(clock->WallNow()),
       last_measurement_time_(clock->WallNow()),
       bytes_since_last_measurement_(0),
-      total_rtt_(QuicTime::Delta::Zero()),
-      chunk_remainder_(0),
-      last_update_time_(QuicWallTime::Zero()),
+      bw_measurement_interval_(QuicTime::Delta::Zero()),
+      last_buffer_update_time_(QuicWallTime::Zero()),
       value_func_() {}
 
 ClientData::~ClientData() {}
 
 void ClientData::reset_chunk_remainder(QuicByteCount x) {
-    chunk_remainder_ = x;
+    chunk_remainder_ = (int64_t)x;
     chunk_index_++;
+    last_measurement_time_ = clock_->WallNow();
+    bytes_since_last_measurement_ = 0;
 }
 
 void ClientData:: update_chunk_remainder(QuicByteCount x) {
-    chunk_remainder_ -= x;
+    chunk_remainder_ -= (int64_t)x;
+    DLOG(INFO) << "Client ID " << client_id_
+        << " chunk remainder " << chunk_remainder_;
     chunk_remainder_ = fmax(0, chunk_remainder_);
 }
 
@@ -50,18 +53,13 @@ QuicBandwidth ClientData::get_rate_estimate() {
   return last_bw_;
 }
 
-void ClientData::update_rtt(QuicTime::Delta rtt){
-  total_rtt_ = total_rtt_ + rtt;
-}
-
 bool ClientData::update_throughput(QuicByteCount x) {
   QuicTime::Delta diff = clock_->WallNow().AbsoluteDifference(last_measurement_time_);
-  total_throughput_ += x;
   bytes_since_last_measurement_ += x;
 
-  if (diff.ToMilliseconds() > 5000) {
-      DLOG(INFO) << "bytes since last measurement " << bytes_since_last_measurement_
-          << "elapsed time " << diff.ToDebugValue();
+  if (diff > bw_measurement_interval_) {
+      //DLOG(INFO) << "bytes since last measurement " << bytes_since_last_measurement_
+      //     << "elapsed time " << diff.ToDebugValue();
       last_bw_ = QuicBandwidth::FromBytesAndTimeDelta(bytes_since_last_measurement_, diff);
       last_measurement_time_ = clock_->WallNow();
       bytes_since_last_measurement_ = 0;
@@ -70,22 +68,13 @@ bool ClientData::update_throughput(QuicByteCount x) {
   return false;
 }
 
-QuicByteCount ClientData::get_throughput() {
-    return total_throughput_;
-}
-
-QuicTime::Delta ClientData::get_time_elapsed(){
-    QuicTime::Delta total_time = clock_->WallNow().AbsoluteDifference(initial_time_);
-    return total_time;
-}
-  
-QuicTime::Delta ClientData::get_total_rtt() {
-    return total_rtt_;
+void ClientData::set_bw_measurement_interval(QuicTime::Delta interval) {
+    bw_measurement_interval_ = interval;
 }
 
 double ClientData::get_buffer_estimate() {
   return buffer_estimate_ -
-    clock_->WallNow().AbsoluteDifference(last_update_time_).ToSeconds();
+    clock_->WallNow().AbsoluteDifference(last_buffer_update_time_).ToSeconds();
 }
 
 double ClientData::get_screen_size() {
@@ -104,13 +93,9 @@ std::string ClientData::get_trace_file() {
   return trace_file_;
 }
 
-QuicWallTime ClientData::get_last_update_time() {
-    return last_update_time_;
-}
-
 void ClientData::set_buffer_estimate(double current_buffer){
 	buffer_estimate_ = current_buffer;
-    last_update_time_ = clock_->WallNow();
+    last_buffer_update_time_ = clock_->WallNow();
 }
 
 void ClientData::set_screen_size(double ss){
@@ -136,6 +121,14 @@ void ClientData::load_value_function(const std::string& filename) {
 
 double ClientData::value_for(double rate, double buf, int br) {
     return value_func_.ValueFor(rate, buf, br);
+}
+
+void ClientData::set_past_qoe(double qoe) {
+    past_qoe_ = qoe;
+}
+
+double ClientData::get_past_qoe() {
+    return past_qoe_;
 }
 
 }  // namespace net

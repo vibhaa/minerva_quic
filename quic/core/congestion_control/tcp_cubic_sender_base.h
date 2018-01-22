@@ -106,6 +106,9 @@ class QUIC_EXPORT_PRIVATE TcpCubicSenderBase : public SendAlgorithmInterface {
 
   bool IsCwndLimited(QuicByteCount bytes_in_flight) const;
 
+  // Override with client_data_ to keep track of chunk remainder.
+  virtual void UpdateWithAck(QuicByteCount acked_bytes);
+
  private:
   friend class test::TcpCubicSenderBasePeer;
 

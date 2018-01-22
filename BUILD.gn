@@ -397,6 +397,8 @@ component("net") {
       "quic/core/congestion_control/prop_ss_tcp_cubic.h",
       "quic/core/congestion_control/prop_ss_fast_tcp.cc",
       "quic/core/congestion_control/prop_ss_fast_tcp.h",
+      "quic/core/congestion_control/value_func_aware.cc",
+      "quic/core/congestion_control/value_func_aware.h",
       "quic/core/congestion_control/prop_ss_bbr_sender.cc",
       "quic/core/congestion_control/prop_ss_bbr_sender.h",
       "quic/core/congestion_control/num_sender.cc",

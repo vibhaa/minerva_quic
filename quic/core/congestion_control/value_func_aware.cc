@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "net/quic/core/congestion_control/num_sender.h"
+#include "net/quic/core/congestion_control/value_func_aware.h"
 
 #include <algorithm>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <iomanip>
-#include <math.h>
 
 #include "net/quic/core/congestion_control/prr_sender.h"
 #include "net/quic/core/congestion_control/rtt_stats.h"
@@ -27,12 +26,13 @@ namespace {
 const QuicByteCount kDefaultMinimumCongestionWindow = 2 * kDefaultTCPMSS;
 }  // namespace
 
-NumSender::NumSender(
+ValueFuncAware::ValueFuncAware(
     const QuicClock* clock,
     const RttStats* rtt_stats,
     QuicPacketCount initial_tcp_congestion_window,
     QuicPacketCount max_congestion_window,
-    QuicConnectionStats* stats)
+    QuicConnectionStats* stats,
+    bool use_fast_tcp)
     : TcpCubicSenderBase(clock, rtt_stats, true, stats), // Only works with "reno"
       cubic_(clock),
       num_acked_packets_(0),
@@ -48,15 +48,21 @@ NumSender::NumSender(
       client_data_(nullptr),
       last_time_(QuicWallTime::Zero()),
       cur_buffer_estimate_(-1.0),
-      start_time_(clock->WallNow()) {}
+      start_time_(clock->WallNow()),
+      use_fast_tcp_(use_fast_tcp),
+      bw_log_file_() {
+         bw_log_file_.open("quic_bw_value_func_aware.cc", std::ios::app);
+      }
 
-NumSender::~NumSender() {}
+ValueFuncAware::~ValueFuncAware() {
+    bw_log_file_.close();
+}
 
-void NumSender::SetAuxiliaryClientData(ClientData* cdata) {
+void ValueFuncAware::SetAuxiliaryClientData(ClientData* cdata) {
     client_data_ = cdata;
 }
 
-void NumSender::SetFromConfig(const QuicConfig& config,
+void ValueFuncAware::SetFromConfig(const QuicConfig& config,
                                         Perspective perspective) {
   TcpCubicSenderBase::SetFromConfig(config, perspective);
   if (config.HasReceivedConnectionOptions() &&
@@ -77,7 +83,7 @@ void NumSender::SetFromConfig(const QuicConfig& config,
   }
 }
 
-void NumSender::SetCongestionWindowFromBandwidthAndRtt(
+void ValueFuncAware::SetCongestionWindowFromBandwidthAndRtt(
     QuicBandwidth bandwidth,
     QuicTime::Delta rtt) {
   QuicByteCount new_congestion_window = bandwidth.ToBytesPerPeriod(rtt);
@@ -88,26 +94,32 @@ void NumSender::SetCongestionWindowFromBandwidthAndRtt(
                         kMaxResumptionCongestionWindow * kDefaultTCPMSS));
 }
 
-void NumSender::SetCongestionWindowInPackets(
+void ValueFuncAware::SetCongestionWindowInPackets(
     QuicPacketCount congestion_window) {
   congestion_window_ = congestion_window * kDefaultTCPMSS;
 }
 
-void NumSender::SetMinCongestionWindowInPackets(
+void ValueFuncAware::SetMinCongestionWindowInPackets(
     QuicPacketCount congestion_window) {
   min_congestion_window_ = congestion_window * kDefaultTCPMSS;
 }
 
-void NumSender::SetNumEmulatedConnections(int num_connections) {
+void ValueFuncAware::SetNumEmulatedConnections(int num_connections) {
   TcpCubicSenderBase::SetNumEmulatedConnections(num_connections);
   cubic_.SetNumConnections(num_connections_);
 }
 
-void NumSender::ExitSlowstart() {
+void ValueFuncAware::ExitSlowstart() {
   slowstart_threshold_ = congestion_window_;
 }
 
-void NumSender::OnPacketLost(QuicPacketNumber packet_number,
+void ValueFuncAware::UpdateWithAck(QuicByteCount acked_bytes) {
+    if (client_data_ != nullptr) {
+        client_data_->update_chunk_remainder(acked_bytes);
+    }
+}
+
+void ValueFuncAware::OnPacketLost(QuicPacketNumber packet_number,
                                        QuicByteCount lost_bytes,
                                        QuicByteCount prior_in_flight) {
   // TCP NewReno (RFC6582) says that once a loss occurs, any losses in packets
@@ -146,17 +158,6 @@ void NumSender::OnPacketLost(QuicPacketNumber packet_number,
     congestion_window_ = congestion_window_ - kDefaultTCPMSS;
   } else if (reno_) {
       float beta = RenoBeta();
-      /*double ss = client_data_->get_screen_size();
-      if (ss == 0) {
-        ss = 1;
-      }
-      ss *= 2;
-      if (client_data_ != nullptr) {
-          double ss = client_data_->get_screen_size();
-          beta = beta * num_connections_ - 0.5 + (3.0 * ss - 1)/(3.0 * ss + 1);
-          beta = beta / num_connections_;
-      } */
-      //beta = (ss - 1 + 0.5) / ss;
       congestion_window_ = congestion_window_ * beta ;
   } else {
     congestion_window_ =
@@ -174,45 +175,55 @@ void NumSender::OnPacketLost(QuicPacketNumber packet_number,
                 << " slowstart threshold: " << slowstart_threshold_;
 }
 
-QuicByteCount NumSender::GetCongestionWindow() const {
+QuicByteCount ValueFuncAware::GetCongestionWindow() const {
   return congestion_window_;
 }
 
-QuicByteCount NumSender::GetSlowStartThreshold() const {
+QuicByteCount ValueFuncAware::GetSlowStartThreshold() const {
   return slowstart_threshold_;
 }
 
-void NumSender::UpdateCongestionWindow() {
-    double gamma = 0.25;
+void ValueFuncAware::UpdateCongestionWindow() {
+    double gamma = 0.4;
     DLOG(INFO) << "Updating congestion window";
     if (client_data_ != nullptr) {
-        double a = 20;
-        double ss = client_data_->get_screen_size();
-        double c = 3.0/4300/ss;
-        double rtt = rtt_stats_->latest_rtt().ToMilliseconds();
-        double rttmin = rtt_stats_->min_rtt().ToMilliseconds();
-        double rate_kbps = congestion_window_ / rtt;
-        double target = rtt/c * log( (c + rtt*a)/(a * (rtt - rttmin) + rttmin * a * exp(-c*rate_kbps)));
-        double scaled = fmin(target / 100000.0, 1.0) * 20;
+        QuicByteCount cs = client_data_->get_chunk_remainder();
+        double buf = client_data_->get_buffer_estimate();
+        QuicBandwidth rate = client_data_->get_rate_estimate();
+        double rebuf_time = 100.0;
+        if (rate.ToBytesPerSecond() > 0) { 
+            buf -= ((double)cs)/rate.ToBytesPerSecond();
+            if (buf < 0) {
+                rebuf_time = -buf;
+                buf = 0.0;
+            }
+        }
+        DLOG(INFO) << "Chunk remainder (bytes) = " << cs
+            << ", bufer = " << buf
+            << ", rate estimate = " << rate.ToKBitsPerSecond();
         
-        congestion_window_ = (int)((1 - gamma) * congestion_window_ + gamma * scaled);
-        DLOG(INFO) << "Updating congestion window for ss " << client_data_->get_screen_size()
-            << " target " << target
-            << " new window " << congestion_window_;
+        //QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(start_time_);
+        //int epoch = time_elapsed.ToMilliseconds() / 30000;
+        double ss = client_data_->get_screen_size();
+        double target = 5.0 * ss;
+        double minrtt = rtt_stats_->min_rtt().ToMilliseconds();
+        double new_wnd = (minrtt / rtt_stats_->latest_rtt().ToMilliseconds()) * congestion_window_ +
+           target * kDefaultTCPMSS; 
+        congestion_window_ = (int)((1 - gamma) * congestion_window_ + gamma * new_wnd);
+        DLOG(INFO) << "Updating congestion window for ss " << client_data_->get_screen_size() << " window " << congestion_window_;
     }
 }
 
 // Called when we receive an ack. Normal TCP tracks how many packets one ack
 // represents, but quic has a separate ack for each packet.
-void NumSender::MaybeIncreaseCwnd(
+void ValueFuncAware::MaybeIncreaseCwnd(
     QuicPacketNumber acked_packet_number,
     QuicByteCount acked_bytes,
     QuicByteCount prior_in_flight,
     QuicTime event_time) {
 
-    std::ofstream bw_log_file;
-    bw_log_file.open("quic_bw_prop_ss.log", std::ios::app);
     if (client_data_ != nullptr) {
+        client_data_->set_bw_measurement_interval(QuicTime::Delta::FromMilliseconds(1000));
         if (acked_packet_number > 4) {
             bool new_update = client_data_->update_throughput(acked_bytes);
             if (new_update) {
@@ -226,7 +237,8 @@ void NumSender::MaybeIncreaseCwnd(
         QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_time_);
         if (ss > 0 && time_elapsed > rtt_stats_->smoothed_rtt()) { 
               last_time_ = clock_->WallNow();
-              bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
+              DLOG(INFO) << "Packet number " << acked_packet_number;
+              bw_log_file_ << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
                        << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
                        << ", \"clientId\": " << client_data_->get_client_id()
                        << ", \"bandwidth_Mbps\": " << client_data_->get_rate_estimate().ToKBitsPerSecond()/1000.0
@@ -245,7 +257,6 @@ void NumSender::MaybeIncreaseCwnd(
     else {
       DLOG(INFO) << "ack without client data";
     }
-    bw_log_file.close();
   
   QUIC_BUG_IF(InRecovery()) << "Never increase the CWND during recovery.";
   // Do not increase the congestion window unless the sender is close to using
@@ -289,13 +300,13 @@ void NumSender::MaybeIncreaseCwnd(
   }
 }
 
-void NumSender::HandleRetransmissionTimeout() {
+void ValueFuncAware::HandleRetransmissionTimeout() {
   cubic_.ResetCubicState();
   slowstart_threshold_ = congestion_window_ / 2;
   congestion_window_ = min_congestion_window_;
 }
 
-void NumSender::OnConnectionMigration() {
+void ValueFuncAware::OnConnectionMigration() {
   TcpCubicSenderBase::OnConnectionMigration();
   cubic_.ResetCubicState();
   num_acked_packets_ = 0;
@@ -304,8 +315,8 @@ void NumSender::OnConnectionMigration() {
   slowstart_threshold_ = initial_max_tcp_congestion_window_;
 }
 
-CongestionControlType NumSender::GetCongestionControlType() const {
-  return kNUM;
+CongestionControlType ValueFuncAware::GetCongestionControlType() const {
+  return kPropSSFast;
 }
 
 }  // namespace net

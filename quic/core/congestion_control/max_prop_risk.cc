@@ -279,7 +279,6 @@ void MaxPropRisk::MaybeIncreaseCwnd(
                      << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
                      << ", \"clientId\": " << client_data_->get_client_id()
                      << ", \"bandwidth_Mbps\": " << client_data_->get_rate_estimate().ToKBitsPerSecond()/1000.0
-                     << ", \"total throughput\": "<< client_data_->get_throughput()
                      << ", \"congestion_window\": "<< congestion_window_
                      << ", \"screen_size\": " << ss
                      << ", \"latest_rtt\": " << rtt_stats_->latest_rtt().ToMilliseconds()

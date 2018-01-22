@@ -28,14 +28,10 @@ class QUIC_EXPORT_PRIVATE ClientData {
   int get_chunk_index();
   QuicBandwidth get_rate_estimate();
   double get_buffer_estimate();
-  QuicWallTime get_last_update_time();
   double get_screen_size();
-  void update_rtt(QuicTime::Delta rtt);
   // Returns true if a new bandwidth estimate is available.
   bool update_throughput(QuicByteCount throughput);
-  QuicByteCount get_throughput();
-  QuicTime::Delta get_time_elapsed();
-  QuicTime::Delta get_total_rtt();
+  void set_bw_measurement_interval(QuicTime::Delta interval);
   void set_buffer_estimate(double current_buffer);
   void set_screen_size(double ss);
   void set_trace_file(std::string);
@@ -48,21 +44,29 @@ class QUIC_EXPORT_PRIVATE ClientData {
   // Use the value function to obtain the value for. 
   double value_for(double rate, double buf, int bitrate);
 
+  // Getter and setter to store / return the last qoe.
+  // The last qoe is not updated by QUIC at all.
+  // ClientData is just used as a vehicle to communicate the past_qoe_
+  // to the congestion control algorithm.
+  void set_past_qoe(double qoe);
+  double get_past_qoe();
+
  private:
   double buffer_estimate_;
   double screen_size_;
   double client_id_;
   int chunk_index_;
   const QuicClock* clock_;
-  
-  QuicByteCount total_throughput_;
+  // Sum of the QoE for all chunks downloaded so far.
+  double past_qoe_;
+  // This *can* go negative, so we explicitly use an int64.
+  int64_t chunk_remainder_;
+
   QuicBandwidth last_bw_;
-  QuicWallTime initial_time_;
   QuicWallTime last_measurement_time_;
   QuicByteCount bytes_since_last_measurement_;
-  QuicTime::Delta total_rtt_;
-  QuicByteCount chunk_remainder_;
-  QuicWallTime last_update_time_;
+  QuicTime::Delta bw_measurement_interval_;
+  QuicWallTime last_buffer_update_time_;
   Video vid_;
   std::string trace_file_;
   ValueFunc value_func_;

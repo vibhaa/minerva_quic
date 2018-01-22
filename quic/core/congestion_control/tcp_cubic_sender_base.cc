@@ -139,12 +139,17 @@ void TcpCubicSenderBase::OnCongestionEvent(
   }
 }
 
+void TcpCubicSenderBase::UpdateWithAck(QuicByteCount acked_bytes) {
+    DLOG(INFO) << "In parent function";
+}
+
 void TcpCubicSenderBase::OnPacketAcked(QuicPacketNumber acked_packet_number,
                                        QuicByteCount acked_bytes,
                                        QuicByteCount prior_in_flight,
                                        QuicTime event_time) {
   largest_acked_packet_number_ =
       std::max(acked_packet_number, largest_acked_packet_number_);
+  UpdateWithAck(acked_bytes);
   if (InRecovery()) {
     if (!no_prr_) {
       // PRR is used when in recovery.
