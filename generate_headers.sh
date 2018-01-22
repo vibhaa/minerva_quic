@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # get files with HTTP headers
 mkdir www.example3.org/Tennis
 wget -r -np -R "index.html*" -p --save-headers http://128.52.168.245:8000/Tennis/ 
@@ -23,3 +22,16 @@ for file in myindex_fastMPC*; do sed -i "21i \ \ \ \ \t\t\tvar url = '/Tennis/Ma
 
 # hardcode video file in
 for file in myindex_fastMPC*; do sed -i "51i \ \ \ \ \t\t\tplayer.setVideoFile('Tennis')" $file; done
+
+# vid_name="Seeking"
+# ip="128.52.168.245:8000"
+# mkdir www.example3.org/$vid_name
+# wget -r -np -R "index.html*" -p --save-headers http://$ip/$vid_name/ 
+# mv $ip/$vid_name/* www.example3.org/$vid_name/
+# rm -rf $ip/
+# cd www.example3.org/$vid_name
+# for file in **/*; do sed -i "7iX-Original-URL: https://www.example3.org/$vid_name/$file" $file; done
+# cp ../dash* .
+# cp ../myindex* .
+# for file in *; do sed -i "6d" $file; done
+# for file in *; do sed -i "6iX-Original-URL: https://www.example3.org/$vid_name/$file" $file; done

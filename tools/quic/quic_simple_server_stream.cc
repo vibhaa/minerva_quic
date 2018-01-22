@@ -129,6 +129,7 @@ std::map<string, string> QuicSimpleServerStream::ParseClientParams(string path_s
   string trace_file = param_map["trace_file"];
   string value_func = param_map["value_func"];
   string past_qoe = param_map["qoe"];
+  string vid_prefix = param_map["vid_prefix"];
   QUIC_DVLOG(0) << "url is " << path_string << "  buffer is" << buffer << "screen size is" << screen;
 
   ClientData *cdata = spdy_session()->get_client_data();
@@ -145,6 +146,9 @@ std::map<string, string> QuicSimpleServerStream::ParseClientParams(string path_s
     string vf_dir = "/home/ubuntu/value_funcs/";
     cdata->load_value_function(vf_dir + value_func);
   }
+  if(vid_prefix.length() > 0)
+    cdata->set_vid_prefix(vid_prefix);
+  
   return param_map;
 }
 
@@ -200,7 +204,7 @@ void QuicSimpleServerStream::SendResponse() {
   // scheme is not included (see |QuicHttpResponseCache::GetKey()|).
 
   string path_string = request_headers_[":path"].as_string();
-  
+
   ParseClientParams(path_string);
 
   string request_url = request_headers_[":authority"].as_string() + path_string;

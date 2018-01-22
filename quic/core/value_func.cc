@@ -20,7 +20,7 @@ ValueFunc::ValueFunc()
       rates_(),
       bitrates_(),
       values_(),
-      br_inverse_() {} 
+      br_inverse_() {}
 
 ValueFunc::ValueFunc(const string& filename)
    : ValueFunc() {

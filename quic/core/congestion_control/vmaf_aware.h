@@ -78,6 +78,11 @@ class QUIC_EXPORT_PRIVATE VmafAware : public TcpCubicSenderBase {
 
   double CwndMultiplier();
 
+  double RiskWeight(double prev_rate);
+  double QoeBasedWeight(double prev_rate);
+  double FitConstantWeight(double prev_rate);
+  double FitBasedWeight(double prev_rate);
+
   // This is the fast TCP update rule.
   void UpdateCongestionWindow();
  private:

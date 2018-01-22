@@ -30,6 +30,9 @@ class Video {
   std::vector<double> string2vec(std::string s);
   std::vector<double> get_bitrates();
 
+  double get_fit_constant();
+  double get_fit_at(double rate);
+
  private:
   double chunk_duration_; // in milliseconds
   double ss_;

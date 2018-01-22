@@ -12,7 +12,7 @@
 
 namespace net {
 
-Video::Video(): 
+Video::Video():
 	chunk_duration_(0)
 	{}
 
@@ -88,7 +88,7 @@ double Video::vmaf_qoe(int chunk_ix, double rate) {
 	double qoe = -1;
 
 	for (unsigned int i = 1; i < bitrates_.size(); ++i){
-	  
+
 	  if ( rate <= bitrates_[i] ) {
 
 		qoe = vmafs_[chunk_ix][i-1];
@@ -120,6 +120,13 @@ void Video::set_fit_file(std::string fname) {
 	}
 }
 
+double Video::get_fit_constant() {
+	return fit_params[2];
+}
+
+double Video::get_fit_at(double rate) { // rate in Kbps
+	return fit_params[0] + fit_params[1] * exp(-1.* fit_params[2]* rate/ 4300.);
+}
 std::vector<double> Video::get_bitrates() {
 	return bitrates_;
 }

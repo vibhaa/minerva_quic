@@ -220,22 +220,9 @@ QuicByteCount VmafAware::GetSlowStartThreshold() const {
   return slowstart_threshold_;
 }
 
-double VmafAware::CwndMultiplier() {
-    double weight = 1.0;
-    int ss = client_data_ -> get_screen_size();
-    
-    QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_weight_update_time_);
-    double prev_rate = 8 * accum_acked_bytes / ((time_elapsed.ToMilliseconds()) / 1000.0); // units : bps
 
-    DLOG(INFO) << "prev_rate is " << prev_rate;
-     
-    double qoe = client_data_ -> get_video() -> qoe(client_data_ -> get_chunk_index(),
-                                                        fmin(prev_rate / 1e3, 10)); // min with 10 Kbps
-    DLOG(INFO) << "qoe : " << qoe;
-
-    double vmaf_weight = (prev_rate / qoe) * 3.77 / 300.0; //cwnd is in bytes
-
-    // risk calculation
+double VmafAware::RiskWeight(double prev_rate) {
+  // risk calculation
     double risk_rate = 0;
     double buf_est = client_data_->get_buffer_estimate();
     if (buf_est > 0) {
@@ -244,23 +231,67 @@ double VmafAware::CwndMultiplier() {
 
     double risk_weight = risk_rate / prev_rate * past_weight_;
 
-    if (ss > 0){
-        DLOG(INFO) << "chunk remainder is " << client_data_->get_chunk_remainder() << " (in Bytes). Buffer is " 
-                                                                            << client_data_->get_buffer_estimate();
-        DLOG(INFO) << "rtt is in ms " << rtt_stats_->latest_rtt().ToMilliseconds() << " last window is "
-                                                                     << congestion_window_;
-        DLOG(INFO) << "risk weight is " << risk_weight << " screen size is " << ss << "vmaf weight is" << vmaf_weight;
+    DLOG(INFO) << "risk weight is " << risk_weight;
+
+    return risk_weight;
+}
+
+double VmafAware::QoeBasedWeight(double prev_rate) {    
+    double qoe = client_data_ -> get_video() -> qoe(client_data_ -> get_chunk_index(),
+                                                        fmax(prev_rate / 1e3, 10)); // min with 10 Kbps
+    DLOG(INFO) << "qoe : " << qoe;
+
+    double vmaf_weight = (prev_rate / qoe) * 3.77 / 300.0 / 1e3; //cwnd is in bytes
+
+    return vmaf_weight;
+}
+
+double VmafAware::FitConstantWeight(double prev_rate) {
+
+    double vmaf_weight = (prev_rate / client_data_-> get_vid() -> get_fit_constant());
+
+    return vmaf_weight;
+}
+
+double VmafAware::FitBasedWeight(double prev_rate) {
+    double vmaf_weight = (prev_rate / client_data_-> get_vid() -> get_fit_at(prev_rate / 1e3)) * 3.77/ 300./ 5.;
+
+    return vmaf_weight;
+}
+
+const double MILLI_SECONDS_LAG = 500;
+
+double VmafAware::CwndMultiplier() {
+
+    QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_weight_update_time_);
+    double prev_rate = 8 * accum_acked_bytes / ((time_elapsed.ToMilliseconds()) / 1000.0); // units : bps
+
+    if ( time_elapsed.ToMilliseconds() == 0 ) {
+        return past_weight_;
     }
 
-     weight = std::max(vmaf_weight, risk_weight);
+    DLOG(INFO) << "prev_rate is " << prev_rate;
+    assert(prev_rate >= 0);
+
+    // Figure out the weight to set here
+    double vmaf_weight = QoeBasedWeight(prev_rate);
+
+    DLOG(INFO) << " screen size = " << client_data_ -> get_screen_size() 
+                << ", vmaf weight is " << vmaf_weight;
+
+    double weight = std::max(vmaf_weight, RiskWeight(prev_rate));
+    
+    weight = fmin(weight, 5);
 
     if (client_data_->get_chunk_index() < 1) weight = 1.0;
-     
-     weight = fmin(weight, 5);
 
-     assert(weight > 0);
+    assert(weight > 0); assert(client_data_ -> get_screen_size() > 0);
 
-    const double MILLI_SECONDS_LAG = 500;
+    DLOG(INFO) << "chunk remainder is " << client_data_->get_chunk_remainder() << " (in Bytes). Buffer is " 
+                                                                        << client_data_->get_buffer_estimate();
+    DLOG(INFO) << "rtt is in ms " << rtt_stats_->latest_rtt().ToMilliseconds() << " last window is "
+                                                                 << congestion_window_;
+
 
     if ( past_weight_ < 0 || time_elapsed >= QuicTime::Delta::FromMilliseconds(MILLI_SECONDS_LAG)) {
         past_weight_ = weight;
@@ -292,7 +323,7 @@ void VmafAware::MaybeIncreaseCwnd(
   
     if (client_data_ != nullptr) {
         std::ofstream bw_log_file;
-        bw_log_file.open("quic_bw_vmaf_aware_" + client_data_ -> get_trace_file() + ".log", std::ios::app);
+        bw_log_file.open("quic_bw_vmaf_aware_.log", std::ios::app);
         double ss = client_data_->get_screen_size();
 
         // log data
