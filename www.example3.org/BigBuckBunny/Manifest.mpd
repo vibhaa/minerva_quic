@@ -13,7 +13,7 @@ Last-Modified: Mon, 22 Jan 2018 23:30:58 GMT
 	xsi:schemaLocation="urn:mpeg:DASH:schema:MPD:2011 http://standards.iso.org/ittf/PubliclyAvailableStandards/MPEG-DASH_schema_files/DASH-MPD.xsd"
 	profiles="urn:mpeg:dash:profile:isoff-live:2011"
 	type="static"
-	mediaPresentationDuration="PT6.0S"
+	mediaPresentationDuration="PT24.0S"
 	minBufferTime="PT4.0S">
 	<ProgramInformation>
 	</ProgramInformation>

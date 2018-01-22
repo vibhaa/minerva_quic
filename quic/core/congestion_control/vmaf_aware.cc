@@ -323,7 +323,7 @@ void VmafAware::MaybeIncreaseCwnd(
   
     if (client_data_ != nullptr) {
         std::ofstream bw_log_file;
-        bw_log_file.open("quic_bw_vmaf_aware_.log", std::ios::app);
+        bw_log_file.open("quic_bw_vmaf_aware.log", std::ios::app);
         double ss = client_data_->get_screen_size();
 
         // log data
