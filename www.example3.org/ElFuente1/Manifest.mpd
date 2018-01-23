@@ -1,0 +1,33 @@
+HTTP/1.0 200 OK
+Server: SimpleHTTP/0.6 Python/2.7.12
+Date: Tue, 23 Jan 2018 02:31:43 GMT
+Content-type: application/octet-stream
+Content-Length: 2094
+X-Original-URL: https://www.example3.org/ElFuente1/Manifest.mpd
+Last-Modified: Tue, 23 Jan 2018 01:33:27 GMT
+
+<?xml version="1.0" encoding="utf-8"?>
+<MPD xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="urn:mpeg:dash:schema:mpd:2011"
+        xmlns:xlink="http://www.w3.org/1999/xlink"
+        xsi:schemaLocation="urn:mpeg:DASH:schema:MPD:2011 http://standards.iso.org/ittf/PubliclyAvailableStandards/MPEG-DASH_schema_files/DASH-MPD.xsd"
+        profiles="urn:mpeg:dash:profile:isoff-live:2011"
+        type="static"
+        mediaPresentationDuration="PT6.0S"
+        minBufferTime="PT4.0S">
+        <ProgramInformation>
+        </ProgramInformation>
+        <Period start="PT0.0S">
+                <AdaptationSet mimeType="video/mp4" segmentAlignment="true" bitstreamSwitching="true">
+                        <SegmentTemplate timescale="1000000" initialization="$RepresentationID$/Header.m4s" media="$RepresentationID$/$Number$.m4s" startNumber="1" duration="4000000" />
+			<Representation id="ElFuente1_70_1080_4300" codecs="avc1.f40028" bandwidth="4300000" width="1920" height="1080" frameRate="30/1" sar="1:1" scanType="progressive"/>
+			<Representation id="ElFuente1_60_720_2350" codecs="avc1.f4001f" bandwidth="2350000" width="1280" height="720" frameRate="30/1" sar="1:1" scanType="progressive"/>
+			<Representation id="ElFuente1_90_1080_7500" codecs="avc1.f40028" bandwidth="7500000" width="1920" height="1080" frameRate="30/1" sar="1:1" scanType="progressive"/>
+			<Representation id="ElFuente1_25_384_750" codecs="avc1.f4001e" bandwidth="750000" width="512" height="384" frameRate="30/1" sar="1:1" scanType="progressive"/>
+			<Representation id="ElFuente1_85_1080_5800" codecs="avc1.f40028" bandwidth="5800000" width="1920" height="1080" frameRate="30/1" sar="1:1" scanType="progressive"/>
+			<Representation id="ElFuente1_50_480_1750" codecs="avc1.f4001e" bandwidth="1750000" width="640" height="480" frameRate="30/1" sar="1:1" scanType="progressive"/>
+			<Representation id="ElFuente1_10_288_375" codecs="avc1.f40015" bandwidth="375000" width="384" height="288" frameRate="30/1" sar="1:1" scanType="progressive"/>
+                </AdaptationSet>
+        </Period>
+</MPD>
+
