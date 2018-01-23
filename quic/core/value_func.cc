@@ -1,5 +1,6 @@
 #include "net/quic/core/value_func.h"
 
+#include <stdlib.h>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -15,7 +16,7 @@ namespace net {
 
 ValueFunc::ValueFunc()
     : parsed_(false),
-      horizon_(0),
+      horizon_(5),
       buffers_(),
       rates_(),
       bitrates_(),
@@ -30,15 +31,16 @@ ValueFunc::ValueFunc(const string& filename)
 ValueFunc::~ValueFunc() {}
 
 double ValueFunc::ValueFor(double buffer, double rate, int prev_bitrate) {
-    if (!parsed_) {
+    DLOG(INFO) << "ValueFor: buffer " << buffer << ", rate " << rate << ", br " << prev_bitrate;
+    if (!parsed_ || prev_bitrate == 0) {
         return 0.0;
     }
     double buf_delta_ = buffers_[1] - buffers_[0];
     double rate_delta_ = rates_[1] - rates_[0];
     size_t buf_ix = (size_t)((buffer - buffers_[0]) / buf_delta_);
-    buf_ix = max((size_t)0, min(buf_ix, buffers_.size()));
+    buf_ix = max((size_t)0, min(buf_ix, buffers_.size() - 1));
     size_t rate_ix = (size_t)((rate - rates_[0]) / rate_delta_);
-    rate_ix = max((size_t)0, min(rate_ix, rates_.size())); 
+    rate_ix = max((size_t)0, min(rate_ix, rates_.size() - 1)); 
     int br_ix = br_inverse_[prev_bitrate];
 
     return values_[rate_ix][buf_ix][br_ix];
@@ -54,23 +56,33 @@ vector<double> ValueFunc::ParseArray(ifstream *file) {
     istringstream iss(line);
     string name;
     iss >> name;
-    DLOG(INFO) << "Parsing " << name;
     int len;
     iss >> len;
     vector<double> arr(len, 0);
 
     getline(*file, line);
-    iss.str(line);
-    int i = 0;
+    istringstream vals(line);
     double next_val;
-    while(iss) {
-        iss >> next_val;
-        arr[i++] = next_val;
+    for(int i = 0; i < len; i++) {
+        vals >> next_val;
+        arr[i] = next_val;
     }
     if (arr.size() != (size_t)len) {
         DLOG(ERROR) << "ERROR: array length mismatch";
     }
+    DLOG(INFO) << "Parsing " << name;
+    DLOG(INFO) << "Got line " << line;
+    DLOG(INFO) << "Parsed: " << ArrToString(arr);
     return arr;
+}
+
+string ValueFunc::ArrToString(vector<double> arr) {
+    string s = "[";
+    for (double d : arr) {
+        s += " " + to_string(d);
+    }
+    s += "]";
+    return s;
 }
 
 void ValueFunc::ParseFrom(const string& filename) {
@@ -81,12 +93,7 @@ void ValueFunc::ParseFrom(const string& filename) {
     }
 
     // Throw away the first array because it's just pos.
-    vector<double> pos = ParseArray(&file);
-    if (pos.size() != 1) {
-        DLOG(ERROR) << "ERROR! Value func must have only a single position";
-        return;
-    }
-    horizon_ = (int)pos[0];
+    ParseArray(&file);
     rates_ = ParseArray(&file);
     buffers_ = ParseArray(&file);
     vector<double> bitrates_fl = ParseArray(&file);
@@ -108,13 +115,18 @@ void ValueFunc::ParseFrom(const string& filename) {
             values_[i][j].resize(bitrates_.size());
             getline(file, line);
             iss.str(line);
+            iss.clear();
             float val;
             for (size_t k = 0; k < bitrates_.size(); k++) {
                 iss >> val;
                 values_[i][j][k] = val;
+                if (rand() % 1000 == 0) {
+                    DLOG(INFO) << "Sample value: " << rates_[i] << ", " << buffers_[j] << ", " << bitrates_[k] << " --> " << val;
+                }
             }
         }
     }
+    parsed_ = true;
     DLOG(INFO) << "Value func loaded. Size = ("
         << values_.size() << " " << values_[0].size()
         << " " << values_[0][0].size() << ")";

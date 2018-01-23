@@ -212,7 +212,7 @@ void ValueFuncAware::UpdateCongestionWindow() {
             client_data_->prev_bitrate());
         buf += 4.0;
         double value = client_data_->get_value_func()->ValueFor(
-                buf, ((double)rate.ToBytesPerSecond())/(1000.0 * 1000.0),
+                buf, ((double)rate.ToBitsPerSecond())/(1000.0 * 1000.0),
                 client_data_->current_bitrate());
         double avg_est_qoe = (client_data_->get_past_qoe() + cur_qoe + value) /
                 (client_data_->get_chunk_index() + 1 + client_data_->get_value_func()->Horizon());
@@ -220,10 +220,18 @@ void ValueFuncAware::UpdateCongestionWindow() {
             << ", cur chunk qoe = " << cur_qoe
             << ", value = " << value
             << ", avg est qoe = " << avg_est_qoe; 
+        // QOEs are within [-5, 20] so use a sigmoid centered at 8 such that values in this range
+        // are more or less linear. Scale so that the adjusted values are in [0, 10].
+        double adjusted_avg_qoe = 10.0/(1 + exp((8-avg_est_qoe)*2/12));
+        // The target now lies in [30/11, 30/1] = [2.7, 30].
+        double target;
+        if (client_data_->get_chunk_index() >= 1) {
+            target = 30.0/(1 + adjusted_avg_qoe);
+        } else {
+            target = 5.0 * client_data_->get_screen_size();
+        }
         //QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(start_time_);
         //int epoch = time_elapsed.ToMilliseconds() / 30000;
-        double ss = client_data_->get_screen_size();
-        double target = 5.0 * ss;
         double minrtt = rtt_stats_->min_rtt().ToMilliseconds();
         double new_wnd = (minrtt / rtt_stats_->latest_rtt().ToMilliseconds()) * congestion_window_ +
            target * kDefaultTCPMSS; 

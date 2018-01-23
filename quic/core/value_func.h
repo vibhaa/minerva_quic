@@ -24,8 +24,10 @@ class QUIC_EXPORT_PRIVATE ValueFunc {
   ValueFunc(const string& filename);
   ~ValueFunc();
 
+  // Expects the buffer in seconds, rate in Mbits/sec.
   double ValueFor(double buffer, double rate, int prev_bitrate);
   int Horizon();
+  string ArrToString(vector<double> arr);
 
  private:
   void ParseFrom(const string& filename);
