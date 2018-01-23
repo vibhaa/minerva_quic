@@ -219,13 +219,14 @@ void ValueFuncAware::UpdateCongestionWindow() {
         DLOG(INFO) << "Past qoe = " << client_data_->get_past_qoe()
             << ", cur chunk qoe = " << cur_qoe
             << ", value = " << value
+            << ", ss = " << client_data_->get_screen_size()
             << ", avg est qoe = " << avg_est_qoe; 
         // QOEs are within [-5, 20] so use a sigmoid centered at 8 such that values in this range
         // are more or less linear. Scale so that the adjusted values are in [0, 10].
         double adjusted_avg_qoe = 10.0/(1 + exp((8-avg_est_qoe)*2/12));
-        // The target now lies in [30/11, 30/1] = [2.7, 30].
         double target;
         if (client_data_->get_chunk_index() >= 1) {
+            // The target now lies in [30/11, 30/1] = [2.7, 30].
             target = 30.0/(1 + adjusted_avg_qoe);
         } else {
             target = 5.0 * client_data_->get_screen_size();

@@ -31,7 +31,6 @@ ValueFunc::ValueFunc(const string& filename)
 ValueFunc::~ValueFunc() {}
 
 double ValueFunc::ValueFor(double buffer, double rate, int prev_bitrate) {
-    DLOG(INFO) << "ValueFor: buffer " << buffer << ", rate " << rate << ", br " << prev_bitrate;
     if (!parsed_ || prev_bitrate == 0) {
         return 0.0;
     }
@@ -70,9 +69,6 @@ vector<double> ValueFunc::ParseArray(ifstream *file) {
     if (arr.size() != (size_t)len) {
         DLOG(ERROR) << "ERROR: array length mismatch";
     }
-    DLOG(INFO) << "Parsing " << name;
-    DLOG(INFO) << "Got line " << line;
-    DLOG(INFO) << "Parsed: " << ArrToString(arr);
     return arr;
 }
 
@@ -120,9 +116,6 @@ void ValueFunc::ParseFrom(const string& filename) {
             for (size_t k = 0; k < bitrates_.size(); k++) {
                 iss >> val;
                 values_[i][j][k] = val;
-                if (rand() % 1000 == 0) {
-                    DLOG(INFO) << "Sample value: " << rates_[i] << ", " << buffers_[j] << ", " << bitrates_[k] << " --> " << val;
-                }
             }
         }
     }
