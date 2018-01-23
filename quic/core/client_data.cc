@@ -18,6 +18,8 @@ ClientData::ClientData(const QuicClock* clock)
       clock_(clock),
       past_qoe_(0.0),
       chunk_remainder_(0),
+      rebuf_penalty_(5.0),
+      smooth_penalty_(1.0),
       last_bw_(QuicBandwidth::Zero()),
       last_measurement_time_(clock->WallNow()),
       bytes_since_last_measurement_(0),
@@ -29,7 +31,10 @@ ClientData::ClientData(const QuicClock* clock)
 ClientData::~ClientData() {}
 
 void ClientData::new_chunk(int bitrate, QuicByteCount chunk_size) {
-    bitrates_.push_back(bitrate);
+    // Hack because the first chunk gives us a bitrate of 0.
+    if (bitrate > 0) {
+        bitrates_.push_back(bitrate);
+    }
     chunk_index_++;
     reset_chunk_remainder(chunk_size);
 }
@@ -42,8 +47,6 @@ void ClientData::reset_chunk_remainder(QuicByteCount x) {
 
 void ClientData:: update_chunk_remainder(QuicByteCount x) {
     chunk_remainder_ -= (int64_t)x;
-    DLOG(INFO) << "Client ID " << client_id_
-        << " chunk remainder " << chunk_remainder_;
     chunk_remainder_ = fmax(0, chunk_remainder_);
 }
 
@@ -125,8 +128,8 @@ void ClientData::load_value_function(const std::string& filename) {
     value_func_ = ValueFunc(filename);
 }
 
-double ClientData::value_for(double rate, double buf, int br) {
-    return value_func_.ValueFor(rate, buf, br);
+ValueFunc* ClientData::get_value_func() {
+    return &value_func_;
 }
 
 void ClientData::set_past_qoe(double qoe) {
@@ -135,6 +138,29 @@ void ClientData::set_past_qoe(double qoe) {
 
 double ClientData::get_past_qoe() {
     return past_qoe_;
+}
+
+double ClientData::utility_for_bitrate(int bitrate) {
+    return 20 - 20.0 * exp(-3.0 * bitrate/4300.0 / screen_size_);
+}
+
+double ClientData::qoe(int bitrate, double rebuf, int prev_bitrate) {
+    return utility_for_bitrate(bitrate) - rebuf_penalty_ * rebuf
+       - smooth_penalty_ * abs(utility_for_bitrate(bitrate) - utility_for_bitrate(prev_bitrate));  
+}
+
+int ClientData::current_bitrate() {
+    if (bitrates_.size() > 0) {
+        return bitrates_[bitrates_.size()-1];
+    }
+    return 0;
+}
+
+int ClientData::prev_bitrate() {
+    if (bitrates_.size() > 1) {
+        return bitrates_[bitrates_.size()-2];
+    }
+    return current_bitrate();
 }
 
 }  // namespace net

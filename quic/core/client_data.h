@@ -40,10 +40,9 @@ class QUIC_EXPORT_PRIVATE ClientData {
   Video* get_video();
   std::string get_trace_file();
 
+  ValueFunc* get_value_func();
   // Load the value function from a file.
   void load_value_function(const std::string& file);
-  // Use the value function to obtain the value for. 
-  double value_for(double rate, double buf, int bitrate);
 
   // Getter and setter to store / return the last qoe.
   // The last qoe is not updated by QUIC at all.
@@ -51,6 +50,16 @@ class QUIC_EXPORT_PRIVATE ClientData {
   // to the congestion control algorithm.
   void set_past_qoe(double qoe);
   double get_past_qoe();
+  // Computes the QoE via the definition.
+  // TODO(vikram/arc): Use VMAF here.
+  double utility_for_bitrate(int bitrate);
+  double qoe(int bitrate, double rebuf_time, int prev_bitrate);
+
+  // Returns the bitrate set by the most recent next_chunk(..) call.
+  // If N/A, then returns 0.
+  int current_bitrate();
+  // Returns the bitrate before the current one, or 0 if N/A.
+  int prev_bitrate();
 
  private:
   double buffer_estimate_;
@@ -62,6 +71,9 @@ class QUIC_EXPORT_PRIVATE ClientData {
   double past_qoe_;
   // This *can* go negative, so we explicitly use an int64.
   int64_t chunk_remainder_;
+  // TODO(vikram,arc): this needs to be filled in at initialization.
+  double rebuf_penalty_;
+  double smooth_penalty_;
 
   QuicBandwidth last_bw_;
   QuicWallTime last_measurement_time_;

@@ -129,7 +129,6 @@ std::map<string, string> QuicSimpleServerStream::ParseClientParams(string path_s
   string trace_file = param_map["trace_file"];
   string value_func = param_map["value_func"];
   string past_qoe = param_map["qoe"];
-  string bitrate = param_map["bitrate"];  
   QUIC_DVLOG(0) << "url is " << path_string << "  buffer is" << buffer << "screen size is" << screen;
 
   ClientData *cdata = spdy_session()->get_client_data();
@@ -220,14 +219,15 @@ void QuicSimpleServerStream::SendResponse() {
     return;
   }
 
-  if (request_url.find(".m4s") != string::npos) {
+  size_t pos = request_url.find(".m4s");
+  if (pos != string::npos && request_url.find("Header.m4s") == string::npos) {
     uint64_t chunk_len = 0;
     int bitrate = 0;
     if (param_map["bitrate"].length() > 0) {
-        bitrate = stoi(param_map["bitrate"]);
+        bitrate = stoi(param_map["bitrate"])/1000;
     }
     QuicTextUtils::StringToUint64(response_headers.find("content-length")->second, &chunk_len);
-    QUIC_DVLOG(0) << "chunk length is" << chunk_len;
+    DLOG(INFO) << "chunk length isi " << chunk_len;
     spdy_session()->get_client_data()->new_chunk(bitrate, chunk_len);  
   }
 

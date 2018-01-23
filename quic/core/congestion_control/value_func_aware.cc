@@ -189,19 +189,37 @@ void ValueFuncAware::UpdateCongestionWindow() {
     if (client_data_ != nullptr) {
         QuicByteCount cs = client_data_->get_chunk_remainder();
         double buf = client_data_->get_buffer_estimate();
-        QuicBandwidth rate = client_data_->get_rate_estimate();
+        //QuicBandwidth rate = client_data_->get_rate_estimate();
+        QuicBandwidth rate = BandwidthEstimate();
         double rebuf_time = 100.0;
         if (rate.ToBytesPerSecond() > 0) { 
             buf -= ((double)cs)/rate.ToBytesPerSecond();
             if (buf < 0) {
                 rebuf_time = -buf;
                 buf = 0.0;
+            } else {
+                rebuf_time = 0.0;
             }
         }
         DLOG(INFO) << "Chunk remainder (bytes) = " << cs
-            << ", bufer = " << buf
+            << ", buffer = " << buf
+            << ", ss = " << client_data_->get_screen_size()
+            << ", chunk_ix = " << client_data_->get_chunk_index()
             << ", rate estimate = " << rate.ToKBitsPerSecond();
-        
+        DLOG(INFO) << "current bitrate " << client_data_->current_bitrate()
+            << ", prev bitrate " << client_data_->prev_bitrate();
+        double cur_qoe = client_data_->qoe(client_data_->current_bitrate(), rebuf_time,
+            client_data_->prev_bitrate());
+        buf += 4.0;
+        double value = client_data_->get_value_func()->ValueFor(
+                buf, ((double)rate.ToBytesPerSecond())/(1000.0 * 1000.0),
+                client_data_->current_bitrate());
+        double avg_est_qoe = (client_data_->get_past_qoe() + cur_qoe + value) /
+                (client_data_->get_chunk_index() + 1 + client_data_->get_value_func()->Horizon());
+        DLOG(INFO) << "Past qoe = " << client_data_->get_past_qoe()
+            << ", cur chunk qoe = " << cur_qoe
+            << ", value = " << value
+            << ", avg est qoe = " << avg_est_qoe; 
         //QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(start_time_);
         //int epoch = time_elapsed.ToMilliseconds() / 30000;
         double ss = client_data_->get_screen_size();
@@ -237,7 +255,6 @@ void ValueFuncAware::MaybeIncreaseCwnd(
         QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_time_);
         if (ss > 0 && time_elapsed > rtt_stats_->smoothed_rtt()) { 
               last_time_ = clock_->WallNow();
-              DLOG(INFO) << "Packet number " << acked_packet_number;
               bw_log_file_ << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
                        << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
                        << ", \"clientId\": " << client_data_->get_client_id()

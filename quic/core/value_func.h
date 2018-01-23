@@ -25,13 +25,14 @@ class QUIC_EXPORT_PRIVATE ValueFunc {
   ~ValueFunc();
 
   double ValueFor(double buffer, double rate, int prev_bitrate);
+  int Horizon();
 
- 
  private:
   void ParseFrom(const string& filename);
   vector<double> ParseArray(ifstream *file);
 
   bool parsed_;
+  int horizon_;
   vector<double> buffers_;
   vector<double> rates_;
   vector<int> bitrates_;

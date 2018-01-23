@@ -15,6 +15,7 @@ namespace net {
 
 ValueFunc::ValueFunc()
     : parsed_(false),
+      horizon_(0),
       buffers_(),
       rates_(),
       bitrates_(),
@@ -41,6 +42,10 @@ double ValueFunc::ValueFor(double buffer, double rate, int prev_bitrate) {
     int br_ix = br_inverse_[prev_bitrate];
 
     return values_[rate_ix][buf_ix][br_ix];
+}
+
+int ValueFunc::Horizon() {
+    return horizon_;
 }
 
 vector<double> ValueFunc::ParseArray(ifstream *file) {
@@ -76,7 +81,12 @@ void ValueFunc::ParseFrom(const string& filename) {
     }
 
     // Throw away the first array because it's just pos.
-    ParseArray(&file);
+    vector<double> pos = ParseArray(&file);
+    if (pos.size() != 1) {
+        DLOG(ERROR) << "ERROR! Value func must have only a single position";
+        return;
+    }
+    horizon_ = (int)pos[0];
     rates_ = ParseArray(&file);
     buffers_ = ParseArray(&file);
     vector<double> bitrates_fl = ParseArray(&file);
