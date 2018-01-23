@@ -103,10 +103,11 @@ std::string ClientData::get_vid_prefix() {
   return vid_prefix_;
 }
 
-// std::string ClientData::get_trace_file() {
-//   assert(trace_file_.length() > 0);
-//   return trace_file_;
-// }
+std::string ClientData::get_trace_file() {
+  assert(false); // Deprecated usage
+  assert(trace_file_.length() > 0);
+  return trace_file_;
+}
 
 void ClientData::set_buffer_estimate(double current_buffer){
 	buffer_estimate_ = current_buffer;
@@ -119,13 +120,13 @@ void ClientData::set_screen_size(double ss){
   // set vmaf scores also here
 }
 
-// void ClientData::set_trace_file(std::string f) {
-//   if (trace_file_.length() > 0 ){
-//     return;
-//   }
-//   DLOG(INFO) << "set_trace_file called with argument " << f;
-//   trace_file_ = f;
-// }
+void ClientData::set_trace_file(std::string f) {
+  if (trace_file_.length() > 0 ){
+    return;
+  }
+  DLOG(INFO) << "set_trace_file called with argument " << f;
+  trace_file_ = f;
+}
 
 void ClientData::load_value_function(const std::string& filename) {
     DLOG(INFO) << "Setting value function from " << filename;

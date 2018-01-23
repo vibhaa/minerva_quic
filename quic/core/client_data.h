@@ -35,10 +35,10 @@ class QUIC_EXPORT_PRIVATE ClientData {
   void set_bw_measurement_interval(QuicTime::Delta interval);
   void set_buffer_estimate(double current_buffer);
   void set_screen_size(double ss);
-  // void set_trace_file(std::string);
+  void set_trace_file(std::string);
   double get_client_id();
   Video* get_video();
-  // std::string get_trace_file();
+  std::string get_trace_file();
   std::string get_vid_prefix();
   void set_vid_prefix(std::string);
   Video* get_vid();
