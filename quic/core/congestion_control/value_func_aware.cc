@@ -51,7 +51,7 @@ ValueFuncAware::ValueFuncAware(
       start_time_(clock->WallNow()),
       use_fast_tcp_(use_fast_tcp),
       bw_log_file_() {
-         bw_log_file_.open("quic_bw_value_func_aware.cc", std::ios::app);
+         bw_log_file_.open("quic_bw_value_func_aware.log", std::ios::app);
       }
 
 ValueFuncAware::~ValueFuncAware() {

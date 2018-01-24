@@ -24,7 +24,7 @@ ClientData::ClientData(const QuicClock* clock)
       bytes_since_last_measurement_(0),
       last_record_time_(QuicWallTime::Zero()),
       last_buffer_update_time_(QuicWallTime::Zero()),
-      bw_measurement_interval_(QuicTime::Delta::FromMilliseconds(500)),
+      bw_measurement_interval_(QuicTime::Delta::FromMilliseconds(250)),
       bw_measurements_(),
       value_func_(),
       bitrates_() {}
