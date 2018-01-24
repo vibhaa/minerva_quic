@@ -1,10 +1,10 @@
 HTTP/1.0 200 OK
 Server: SimpleHTTP/0.6 Python/2.7.12
-Date: Mon, 22 Jan 2018 23:58:51 GMT
+Date: Wed, 24 Jan 2018 04:33:27 GMT
 Content-type: application/octet-stream
-Content-Length: 2499
+Content-Length: 2501
 X-Original-URL: https://www.example3.org/BigBuckBunny/Manifest.mpd
-Last-Modified: Mon, 22 Jan 2018 23:30:58 GMT
+Last-Modified: Wed, 24 Jan 2018 03:37:50 GMT
 
 <?xml version="1.0" encoding="utf-8"?>
 <MPD xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -13,7 +13,7 @@ Last-Modified: Mon, 22 Jan 2018 23:30:58 GMT
 	xsi:schemaLocation="urn:mpeg:DASH:schema:MPD:2011 http://standards.iso.org/ittf/PubliclyAvailableStandards/MPEG-DASH_schema_files/DASH-MPD.xsd"
 	profiles="urn:mpeg:dash:profile:isoff-live:2011"
 	type="static"
-	mediaPresentationDuration="PT24.0S"
+	mediaPresentationDuration="PT200.0S"
 	minBufferTime="PT4.0S">
 	<ProgramInformation>
 	</ProgramInformation>

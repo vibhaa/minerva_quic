@@ -1,8 +1,8 @@
 #!/bin/bash
-for vid in BigBuckBunny  BirdsInCage  CrowdRun  ElFuente1  ElFuente2  FoxBird  OldTownCross  Seeking  Tennis
+for vid in BigBuckBunny  BirdsInCage  CrowdRun  ElFuente1  ElFuente2  FoxBird  OldTownCross  Seeking  Tennis 
 do
-	vid_dir=preprocessed_vids/$vid/
-	server=localhost\:8000 # vid_dir=www.example3.org/$vid/
+	vid_dir=www.example3.org/$vid/
+	server=34.239.109.157\:8000 # vid_dir=www.example3.org/$vid/
 	
 	mkdir $vid_dir
 	# get files with HTTP headers
