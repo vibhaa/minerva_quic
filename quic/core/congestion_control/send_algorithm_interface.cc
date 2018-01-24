@@ -35,7 +35,7 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
   QuicPacketCount max_congestion_window = kDefaultMaxCongestionWindowPackets;
 
   // Hardcode our choice of congestion control :O
-  congestion_control_type = kVMAFAware;
+  congestion_control_type = kPropSSFast;
 
   switch (congestion_control_type) {
     case kBBR:

@@ -26,7 +26,7 @@ do
 	for file in myindex_fastMPC*; do sed -i "21i \ \ \ \ \t\t\tvar url = '/$vid/Manifest.mpd';" $file; done
 
 	# hardcode video file in
-	for file in myindex_fastMPC*; do sed -i "51i \ \ \ \ \t\t\tplayer.setVideoFile('$vid')" $file; done
+	for file in myindex_fastMPC*; do sed -i "51i \ \ \ \ \t\t\tplayer.setVideoFile('$vid');" $file; done
 
 	cd -
 
