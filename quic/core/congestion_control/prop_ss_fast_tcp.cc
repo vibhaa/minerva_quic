@@ -208,15 +208,6 @@ void PropSSFastTcp::MaybeIncreaseCwnd(
     std::ofstream bw_log_file;
     bw_log_file.open("quic_bw_prop_ss.log", std::ios::app);
     if (client_data_ != nullptr) {
-        if (acked_packet_number > 4) {
-            client_data_->update_throughput(acked_bytes);
-            /*if (new_update) {
-                DLOG(INFO) << "inside packet_number: " << acked_packet_number
-                    << ", congestion window: " << congestion_window_
-                    << ", last_bw_estimate: " << client_data_->get_rate_estimate().ToDebugValue();
-            }*/       
-        }
-
         double ss = client_data_->get_screen_size();
         QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_time_);
         if (ss > 0 && time_elapsed > rtt_stats_->smoothed_rtt()) { 
@@ -224,7 +215,7 @@ void PropSSFastTcp::MaybeIncreaseCwnd(
               bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
                        << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
                        << ", \"clientId\": " << client_data_->get_client_id()
-                       << ", \"bandwidth_Mbps\": " << client_data_->get_rate_estimate().ToKBitsPerSecond()/1000.0
+                       << ", \"bandwidth_Mbps\": " << client_data_->get_latest_rate_estimate().ToKBitsPerSecond()/1000.0
                        << ", \"congestion_window\": "<< congestion_window_
                        << ", \"latest_rtt\": " << rtt_stats_->latest_rtt().ToMilliseconds()
                        << ", \"screen_size\": " << ss

@@ -20,11 +20,12 @@ ClientData::ClientData(const QuicClock* clock)
       chunk_remainder_(0),
       rebuf_penalty_(5.0),
       smooth_penalty_(1.0),
-      last_bw_(QuicBandwidth::Zero()),
-      last_measurement_time_(clock->WallNow()),
+      last_measurement_start_time_(clock->WallNow()),
       bytes_since_last_measurement_(0),
-      bw_measurement_interval_(QuicTime::Delta::Zero()),
+      last_record_time_(QuicWallTime::Zero()),
       last_buffer_update_time_(QuicWallTime::Zero()),
+      bw_measurement_interval_(QuicTime::Delta::FromMilliseconds(500)),
+      bw_measurements_(),
       value_func_(),
       bitrates_() {}
 
@@ -41,13 +42,26 @@ void ClientData::new_chunk(int bitrate, QuicByteCount chunk_size) {
 
 void ClientData::reset_chunk_remainder(QuicByteCount x) {
     chunk_remainder_ = (int64_t)x;
-    last_measurement_time_ = clock_->WallNow();
+    reset_bw_measurement();
+}
+
+void ClientData::reset_bw_measurement() {
+    QuicWallTime now = clock_->WallNow();
+    last_measurement_start_time_ = now;
+    last_record_time_ = now;
     bytes_since_last_measurement_ = 0;
 }
 
-void ClientData:: update_chunk_remainder(QuicByteCount x) {
+void ClientData::update_chunk_remainder(QuicByteCount x) {
     chunk_remainder_ -= (int64_t)x;
     chunk_remainder_ = fmax(0, chunk_remainder_);
+    last_record_time_ = clock_->WallNow();
+    QuicTime::Delta interval = last_record_time_.AbsoluteDifference(last_measurement_start_time_);
+    if (interval > bw_measurement_interval_) {
+        QuicBandwidth meas = QuicBandwidth::FromBytesAndTimeDelta(bytes_since_last_measurement_, interval);
+        bw_measurements_.push_back(meas);
+        reset_bw_measurement();
+    }
 }
 
 QuicByteCount ClientData::get_chunk_remainder() {
@@ -58,27 +72,16 @@ int ClientData::get_chunk_index() {
     return chunk_index_;
 }
   
-QuicBandwidth ClientData::get_rate_estimate() {
-  return last_bw_;
+QuicBandwidth ClientData::get_latest_rate_estimate() {
+    if (bw_measurements_.size() == 0) {
+        return QuicBandwidth::Zero();
+    }
+    return bw_measurements_[bw_measurements_.size() - 1];
 }
 
-bool ClientData::update_throughput(QuicByteCount x) {
-  QuicTime::Delta diff = clock_->WallNow().AbsoluteDifference(last_measurement_time_);
-  bytes_since_last_measurement_ += x;
-
-  if (diff > bw_measurement_interval_) {
-      //DLOG(INFO) << "bytes since last measurement " << bytes_since_last_measurement_
-      //     << "elapsed time " << diff.ToDebugValue();
-      last_bw_ = QuicBandwidth::FromBytesAndTimeDelta(bytes_since_last_measurement_, diff);
-      last_measurement_time_ = clock_->WallNow();
-      bytes_since_last_measurement_ = 0;
-      return true;
-  }
-  return false;
-}
-
-void ClientData::set_bw_measurement_interval(QuicTime::Delta interval) {
-    bw_measurement_interval_ = interval;
+void ClientData::record_acked_bytes(QuicByteCount x) {
+    bytes_since_last_measurement_ += x;
+    update_chunk_remainder(x);
 }
 
 double ClientData::get_buffer_estimate() {

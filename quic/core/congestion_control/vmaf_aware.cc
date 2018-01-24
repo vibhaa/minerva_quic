@@ -333,7 +333,7 @@ void VmafAware::MaybeIncreaseCwnd(
         bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
                  << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
                  << ", \"clientId\": " << client_data_->get_client_id()
-                 << ", \"bandwidth_Mbps\": " << client_data_->get_rate_estimate().ToKBitsPerSecond()/1000.0
+                 << ", \"bandwidth_Mbps\": " << client_data_->get_latest_rate_estimate().ToKBitsPerSecond()/1000.0
                  << ", \"congestion_window\": "<< congestion_window_
                  << ", \"screen_size\": " << ss
                  << ", \"multiplier\": " << log_multiplier
@@ -343,7 +343,7 @@ void VmafAware::MaybeIncreaseCwnd(
                  << "}\n";
         }
 
-        client_data_->update_chunk_remainder(acked_bytes);
+        client_data_->record_acked_bytes(acked_bytes);
         accum_acked_bytes += acked_bytes;
         assert(acked_bytes >= 0);
         // This is how we tell if we got a new chunk request.

@@ -115,7 +115,7 @@ void ValueFuncAware::ExitSlowstart() {
 
 void ValueFuncAware::UpdateWithAck(QuicByteCount acked_bytes) {
     if (client_data_ != nullptr) {
-        client_data_->update_chunk_remainder(acked_bytes);
+        client_data_->record_acked_bytes(acked_bytes);
     }
 }
 
@@ -184,13 +184,12 @@ QuicByteCount ValueFuncAware::GetSlowStartThreshold() const {
 }
 
 void ValueFuncAware::UpdateCongestionWindow() {
-    double gamma = 0.4;
+    double gamma = 0.8;
     DLOG(INFO) << "Updating congestion window";
     if (client_data_ != nullptr) {
         QuicByteCount cs = client_data_->get_chunk_remainder();
         double buf = client_data_->get_buffer_estimate();
-        //QuicBandwidth rate = client_data_->get_rate_estimate();
-        QuicBandwidth rate = BandwidthEstimate();
+        QuicBandwidth rate = client_data_->get_latest_rate_estimate();
         double rebuf_time = 100.0;
         if (rate.ToBytesPerSecond() > 0) { 
             buf -= ((double)cs)/rate.ToBytesPerSecond();
@@ -227,10 +226,12 @@ void ValueFuncAware::UpdateCongestionWindow() {
         double target;
         if (client_data_->get_chunk_index() >= 1) {
             // The target now lies in [30/11, 30/1] = [2.7, 30].
-            target = 30.0/(1 + adjusted_avg_qoe);
+            target = 15.0 * rate.ToKBitsPerSecond()/(1000.0 * (1 + adjusted_avg_qoe));
         } else {
             target = 5.0 * client_data_->get_screen_size();
         }
+        DLOG(INFO) << "Adjusted avg qoe w/ sigmoid = " << adjusted_avg_qoe
+            << ", target (packets) = " << target;
         //QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(start_time_);
         //int epoch = time_elapsed.ToMilliseconds() / 30000;
         double minrtt = rtt_stats_->min_rtt().ToMilliseconds();
@@ -250,16 +251,6 @@ void ValueFuncAware::MaybeIncreaseCwnd(
     QuicTime event_time) {
 
     if (client_data_ != nullptr) {
-        client_data_->set_bw_measurement_interval(QuicTime::Delta::FromMilliseconds(1000));
-        if (acked_packet_number > 4) {
-            bool new_update = client_data_->update_throughput(acked_bytes);
-            if (new_update) {
-                DLOG(INFO) << "inside packet_number: " << acked_packet_number
-                    << ", congestion window: " << congestion_window_
-                    << ", last_bw_estimate: " << client_data_->get_rate_estimate().ToDebugValue();
-            }        
-        }
-
         double ss = client_data_->get_screen_size();
         QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_time_);
         if (ss > 0 && time_elapsed > rtt_stats_->smoothed_rtt()) { 
@@ -267,7 +258,7 @@ void ValueFuncAware::MaybeIncreaseCwnd(
               bw_log_file_ << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
                        << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
                        << ", \"clientId\": " << client_data_->get_client_id()
-                       << ", \"bandwidth_Mbps\": " << client_data_->get_rate_estimate().ToKBitsPerSecond()/1000.0
+                       << ", \"bandwidth_Mbps\": " << client_data_->get_latest_rate_estimate().ToKBitsPerSecond()/1000.0
                        << ", \"congestion_window\": "<< congestion_window_
                        << ", \"latest_rtt\": " << rtt_stats_->latest_rtt().ToMilliseconds()
                        << ", \"screen_size\": " << ss

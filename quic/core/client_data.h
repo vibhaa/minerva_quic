@@ -27,12 +27,11 @@ class QUIC_EXPORT_PRIVATE ClientData {
   void update_chunk_remainder(QuicByteCount x);
   QuicByteCount get_chunk_remainder();
   int get_chunk_index();
-  QuicBandwidth get_rate_estimate();
+  QuicBandwidth get_latest_rate_estimate();
   double get_buffer_estimate();
   double get_screen_size();
   // Returns true if a new bandwidth estimate is available.
-  bool update_throughput(QuicByteCount throughput);
-  void set_bw_measurement_interval(QuicTime::Delta interval);
+  void record_acked_bytes(QuicByteCount x);
   void set_buffer_estimate(double current_buffer);
   void set_screen_size(double ss);
   void set_trace_file(std::string);
@@ -65,6 +64,8 @@ class QUIC_EXPORT_PRIVATE ClientData {
   int prev_bitrate();
 
  private:
+  void reset_bw_measurement();
+  
   double buffer_estimate_;
   double screen_size_;
   double client_id_;
@@ -78,11 +79,12 @@ class QUIC_EXPORT_PRIVATE ClientData {
   double rebuf_penalty_;
   double smooth_penalty_;
 
-  QuicBandwidth last_bw_;
-  QuicWallTime last_measurement_time_;
+  QuicWallTime last_measurement_start_time_;
   QuicByteCount bytes_since_last_measurement_;
-  QuicTime::Delta bw_measurement_interval_;
+  QuicWallTime last_record_time_;
   QuicWallTime last_buffer_update_time_;
+  QuicTime::Delta bw_measurement_interval_;
+  std::vector<QuicBandwidth> bw_measurements_;
   Video vid_;
   std::string trace_file_;
   ValueFunc value_func_;
