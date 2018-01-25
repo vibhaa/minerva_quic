@@ -115,9 +115,9 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
 
   QuicWallTime start_time_;
 
-  // True if we're using the delay-based FAST-TCP as a our rate control.
-  // If false, defaults to using Cubic.
-  bool use_fast_tcp_;
+  // kind of transport used - transFast/transReno/transCubic corresponding to
+  // whether its running on fastTCP, Reno or Cubic
+  TransportType transport_;
 
   // Handle of the log file we write to, so we don't reopen the file
   // on every ack that we get.

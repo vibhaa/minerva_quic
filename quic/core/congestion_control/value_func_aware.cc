@@ -33,7 +33,7 @@ ValueFuncAware::ValueFuncAware(
     QuicPacketCount max_congestion_window,
     QuicConnectionStats* stats,
     TransportType transport)
-    : TcpCubicSenderBase(clock, rtt_stats, true, stats), // Only works with "reno"
+    : TcpCubicSenderBase(clock, rtt_stats, transport == transReno, stats), 
       cubic_(clock),
       num_acked_packets_(0),
       congestion_window_(initial_tcp_congestion_window * kDefaultTCPMSS),
@@ -49,7 +49,7 @@ ValueFuncAware::ValueFuncAware(
       last_time_(QuicWallTime::Zero()),
       cur_buffer_estimate_(-1.0),
       start_time_(clock->WallNow()),
-      use_fast_tcp_(transport == transFast),
+      transport_(transport),
       bw_log_file_() {
       }
 
@@ -155,7 +155,7 @@ void ValueFuncAware::OnPacketLost(QuicPacketNumber packet_number,
       min_slow_start_exit_window_ = congestion_window_ / 2;
     }
     congestion_window_ = congestion_window_ - kDefaultTCPMSS;
-  } else if (reno_) {
+  } else if (transport_ == transReno) {
       float beta = RenoBeta();
       congestion_window_ = congestion_window_ * beta ;
   } else {
@@ -306,7 +306,7 @@ void ValueFuncAware::MaybeIncreaseCwnd(
   
    ++num_acked_packets_;
   // Congestion avoidance.
-  if (use_fast_tcp_) {
+  if (transport_ == transFast) {
      // Update cwnd once every RTT, like for reno
      // TODO(vikram): what if we do this on every ack? Too much?
      if (num_acked_packets_ * num_connections_ >=
@@ -314,7 +314,7 @@ void ValueFuncAware::MaybeIncreaseCwnd(
         UpdateCwndFastTCP();
         num_acked_packets_ = 0;
      }
-  } else if (reno_) {
+  } else if (transport_ == transReno) {
     // Classic Reno congestion avoidance.
     // Divide by num_connections to smoothly increase the CWND at a faster rate
     // than conventional Reno.
@@ -353,7 +353,12 @@ void ValueFuncAware::OnConnectionMigration() {
 }
 
 CongestionControlType ValueFuncAware::GetCongestionControlType() const {
-  return kPropSSFast;
+  if (transport_ == transFast)
+    return kValueFuncFast;
+  else if (transport_ == transCubic)
+    return kValueFuncCubic;
+  else
+    return kValueFuncReno;
 }
 
 }  // namespace net
