@@ -31,7 +31,8 @@ PropSSFastTcp::PropSSFastTcp(
     const RttStats* rtt_stats,
     QuicPacketCount initial_tcp_congestion_window,
     QuicPacketCount max_congestion_window,
-    QuicConnectionStats* stats)
+    QuicConnectionStats* stats,
+    TransportType transport)
     : TcpCubicSenderBase(clock, rtt_stats, true, stats), // Only works with "reno"
       cubic_(clock),
       num_acked_packets_(0),

@@ -32,7 +32,7 @@ ValueFuncAware::ValueFuncAware(
     QuicPacketCount initial_tcp_congestion_window,
     QuicPacketCount max_congestion_window,
     QuicConnectionStats* stats,
-    bool use_fast_tcp)
+    TransportType transport)
     : TcpCubicSenderBase(clock, rtt_stats, true, stats), // Only works with "reno"
       cubic_(clock),
       num_acked_packets_(0),
@@ -49,7 +49,7 @@ ValueFuncAware::ValueFuncAware(
       last_time_(QuicWallTime::Zero()),
       cur_buffer_estimate_(-1.0),
       start_time_(clock->WallNow()),
-      use_fast_tcp_(use_fast_tcp),
+      use_fast_tcp_(transport == transFast),
       bw_log_file_() {
       }
 

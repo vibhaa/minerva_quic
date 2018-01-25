@@ -89,8 +89,44 @@ QUIC_FLAG(bool, FLAGS_quic_reloadable_flag_quic_account_handshake, true)
 // 3RTOs if there are no open streams.
 QUIC_FLAG(bool, FLAGS_quic_reloadable_flag_quic_enable_3rtos, false)
 
+// Experimental flag for switching to Reno congestion-control
+QUIC_FLAG(bool, FLAGS_quic_reloadable_flag_quic_use_reno, false)
+
+// Experimental flag for switching to Cubic congestion-control
+QUIC_FLAG(bool, FLAGS_quic_reloadable_flag_quic_use_cubic, true)
+
+// Experimental flag for switching to PCC congestion-control
+QUIC_FLAG(bool, FLAGS_quic_reloadable_flag_quic_use_pcc, false)
+
+// Experimental flag for switching to BBR congestion control
+QUIC_FLAG(bool, FLAGS_quic_reloadable_flag_quic_use_bbr, false)
+
 // If true, enable experiment for testing PCC congestion-control.
 QUIC_FLAG(bool, FLAGS_quic_reloadable_flag_quic_enable_pcc, false)
+
+// When true, defaults to PropSSCubic instead of Cubic.
+QUIC_FLAG(bool, FLAGS_quic_default_to_propss_cubic, false)
+
+// When true, defaults to PropSSFast instead of Cubic.
+QUIC_FLAG(bool, FLAGS_quic_default_to_propss_fast, false)
+
+// When true, defaults to VMAFAwareCubic instead of Cubic.
+QUIC_FLAG(bool, FLAGS_quic_default_to_vmaf_cubic, false)
+
+// When true, defaults to VMAFAwareReno instead of Cubic.
+QUIC_FLAG(bool, FLAGS_quic_default_to_vmaf_reno, false)
+
+// When true, defaults to VMAFAwareFast instead of Cubic.
+QUIC_FLAG(bool, FLAGS_quic_default_to_vmaf_fast, false)
+
+// When true, defaults to ValueFuncCubic instead of Cubic.
+QUIC_FLAG(bool, FLAGS_quic_default_to_vf_cubic, false)
+
+// When true, defaults to ValueFuncRenoinstead of Cubic.
+QUIC_FLAG(bool, FLAGS_quic_default_to_vf_reno, false)
+
+// When true, defaults to ValueFuncFastTCP instead of Cubic.
+QUIC_FLAG(bool, FLAGS_quic_default_to_vf_fast, false)
 
 // When true, defaults to BBR congestion control instead of Cubic.
 QUIC_FLAG(bool, FLAGS_quic_reloadable_flag_quic_default_to_bbr, false)

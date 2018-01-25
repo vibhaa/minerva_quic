@@ -34,7 +34,8 @@ class QUIC_EXPORT_PRIVATE PropSSFastTcp : public TcpCubicSenderBase {
                       const RttStats* rtt_stats,
                       QuicPacketCount initial_tcp_congestion_window,
                       QuicPacketCount max_congestion_window,
-                      QuicConnectionStats* stats);
+                      QuicConnectionStats* stats,
+                      TransportType transport);
   ~PropSSFastTcp() override;
 
   void SetAuxiliaryClientData(ClientData* client_data) override;

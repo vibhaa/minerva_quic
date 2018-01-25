@@ -208,4 +208,65 @@ void QuicSimpleServer::OnReadComplete(int result) {
   StartReading();
 }
 
+// Sets the Quic flags associated with each congestion control type
+// For safety, makes the other types false
+// Quic Connection was modified to use these flags
+void QuicSimpleServer::SetCongestionControlType(enum CongestionControlType cc_type) {
+    // set all flags to false temporarily
+    SetQuicFlag(&FLAGS_quic_reloadable_flag_quic_use_bbr, false);
+    SetQuicFlag(&FLAGS_quic_reloadable_flag_quic_use_cubic, false);
+    SetQuicFlag(&FLAGS_quic_reloadable_flag_quic_use_pcc, false);
+    SetQuicFlag(&FLAGS_quic_reloadable_flag_quic_use_reno, false);
+    SetQuicFlag(&FLAGS_quic_default_to_vf_cubic, false);
+    SetQuicFlag(&FLAGS_quic_default_to_vf_reno, false);  
+    SetQuicFlag(&FLAGS_quic_default_to_vf_fast, false);
+    SetQuicFlag(&FLAGS_quic_default_to_vmaf_cubic, false);  
+    SetQuicFlag(&FLAGS_quic_default_to_vmaf_reno, false); 
+    SetQuicFlag(&FLAGS_quic_default_to_vmaf_fast, false);
+    SetQuicFlag(&FLAGS_quic_default_to_propss_cubic, false);
+    SetQuicFlag(&FLAGS_quic_default_to_propss_fast, false);
+
+    switch (cc_type) {
+        case net::kBBR:
+            SetQuicFlag(&FLAGS_quic_reloadable_flag_quic_use_bbr, true);
+            break;
+        case net::kCubicBytes:
+            SetQuicFlag(&FLAGS_quic_reloadable_flag_quic_use_cubic, true);
+            break;
+        case net::kPCC:
+            SetQuicFlag(&FLAGS_quic_reloadable_flag_quic_use_pcc, true);
+            break;
+        case net::kRenoBytes:
+            SetQuicFlag(&FLAGS_quic_reloadable_flag_quic_use_reno, true);
+            break;
+        case net::kValueFuncCubic:
+            SetQuicFlag(&FLAGS_quic_default_to_vf_cubic, true);
+            break;
+        case net::kValueFuncReno:
+            SetQuicFlag(&FLAGS_quic_default_to_vf_reno, true);
+            break;
+        case net::kValueFuncFast:
+            SetQuicFlag(&FLAGS_quic_default_to_vf_fast, true); 
+            break;
+        case net::kVMAFAwareCubic:
+            SetQuicFlag(&FLAGS_quic_default_to_vmaf_cubic, true);
+            break;
+        case net::kVMAFAwareReno:
+            SetQuicFlag(&FLAGS_quic_default_to_vmaf_reno, true);
+            break;
+        case net::kVMAFAwareFast:
+            SetQuicFlag(&FLAGS_quic_default_to_vmaf_fast, true);
+            break;
+        case net::kPropSSCubic:
+            SetQuicFlag(&FLAGS_quic_default_to_propss_cubic, true);
+            break;
+        case net::kPropSSFast:
+            SetQuicFlag(&FLAGS_quic_default_to_propss_fast, true);
+            break;  
+        default:
+            SetQuicFlag(&FLAGS_quic_reloadable_flag_quic_use_cubic, true);
+            break;
+    }
+}
+
 }  // namespace net

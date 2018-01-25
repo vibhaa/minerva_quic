@@ -35,7 +35,7 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
                       QuicPacketCount initial_tcp_congestion_window,
                       QuicPacketCount max_congestion_window,
                       QuicConnectionStats* stats,
-                      bool use_fast_tcp);
+                      TransportType transport);
   ~ValueFuncAware() override;
 
   void SetAuxiliaryClientData(ClientData* client_data) override;

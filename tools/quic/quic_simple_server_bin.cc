@@ -57,7 +57,8 @@ int main(int argc, char* argv[]) {
         "--quic_response_cache_dir  directory containing response data\n"
         "                            to load\n"
         "--certificate_file=<file>   path to the certificate chain\n"
-        "--key_file=<file>           path to the pkcs8 private key\n";
+        "--key_file=<file>           path to the pkcs8 private key\n"
+        "--congestion_control        type of congestion control to use:"; 
     std::cout << help_str;
     exit(0);
   }
@@ -85,6 +86,11 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+  if (!line->HasSwitch("congestion_control")) {
+    LOG(ERROR) << "missing --congestion_control";
+    return 1;
+  }
+
   if (!line->HasSwitch("host_ip")) {
     LOG(WARNING) << "missing --host_ip, so defaulting to 0.0.0.0. " <<
         "This will not work with Mahimahi";
@@ -102,6 +108,37 @@ int main(int argc, char* argv[]) {
                         line->GetSwitchValuePath("key_file")),
       config, net::QuicCryptoServerConfig::ConfigOptions(),
       net::AllSupportedTransportVersions(), &response_cache);
+
+  std::string cc_type = line->GetSwitchValueASCII("congestion_control");
+  LOG(INFO) << "CC: " << cc_type;
+  if (cc_type == "bbr") {
+      server.SetCongestionControlType(net::kBBR);
+  } else if (cc_type == "valueFuncFast") {
+      server.SetCongestionControlType(net::kValueFuncFast);
+  } else if (cc_type == "valueFuncCubic") {
+      server.SetCongestionControlType(net::kValueFuncCubic);
+  } else if (cc_type == "valueFuncReno") {
+      server.SetCongestionControlType(net::kValueFuncReno);
+  } else if (cc_type == "VMAFAwareFast") {
+      server.SetCongestionControlType(net::kVMAFAwareFast);
+  } else if (cc_type == "VMAFAwareCubic") {
+      server.SetCongestionControlType(net::kVMAFAwareCubic);
+  } else if (cc_type == "VMAFAwareReno") {
+      server.SetCongestionControlType(net::kVMAFAwareReno);
+  } else if (cc_type == "PropSSFast") {
+      server.SetCongestionControlType(net::kPropSSFast);
+  } else if (cc_type == "PropSSCubic") {
+      server.SetCongestionControlType(net::kPropSSCubic);
+  } else if (cc_type == "cubic") {
+      server.SetCongestionControlType(net::kCubicBytes);
+  } else if (cc_type  == "reno") {
+      server.SetCongestionControlType(net::kRenoBytes);
+  } else if (cc_type == "pcc") {
+      server.SetCongestionControlType(net::kPCC);
+  } else {
+    LOG(ERROR) << "invalid --congestion_control";
+    return 1;
+  }
 
   int rc = server.Listen(net::IPEndPoint(ip, FLAGS_port));
   if (rc < 0) {

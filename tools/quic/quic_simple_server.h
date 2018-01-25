@@ -21,6 +21,8 @@
 #include "net/quic/core/quic_version_manager.h"
 #include "net/quic/platform/impl/quic_chromium_clock.h"
 #include "net/tools/quic/quic_http_response_cache.h"
+#include "net/quic/core/quic_types.h"
+#include "net/quic/platform/api/quic_flags.h"
 
 namespace net {
 
@@ -61,6 +63,11 @@ class QuicSimpleServer {
   QuicDispatcher* dispatcher() { return dispatcher_.get(); }
 
   IPEndPoint server_address() const { return server_address_; }
+
+  // New function to enable setting congestion control from the command line for the toy server provided
+ // Called by the server binary after the simple server is constructed
+ // By default, uses Cubic
+  void SetCongestionControlType(enum CongestionControlType cc_type);
 
  private:
   friend class test::QuicSimpleServerPeer;

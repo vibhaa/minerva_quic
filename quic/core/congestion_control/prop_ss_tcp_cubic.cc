@@ -32,7 +32,8 @@ PropSSTcpCubic::PropSSTcpCubic(
     bool reno,
     QuicPacketCount initial_tcp_congestion_window,
     QuicPacketCount max_congestion_window,
-    QuicConnectionStats* stats)
+    QuicConnectionStats* stats,
+    TransportType transport)
     : TcpCubicSenderBase(clock, rtt_stats, reno, stats),
       cubic_(clock),
       num_acked_packets_(0),

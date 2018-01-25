@@ -35,7 +35,8 @@ class QUIC_EXPORT_PRIVATE VmafAware : public TcpCubicSenderBase {
                       bool reno,
                       QuicPacketCount initial_tcp_congestion_window,
                       QuicPacketCount max_congestion_window,
-                      QuicConnectionStats* stats);
+                      QuicConnectionStats* stats,
+                      TransportType transport);
   ~VmafAware() override;
 
   void SetAuxiliaryClientData(ClientData* client_data) override;
@@ -89,6 +90,8 @@ class QUIC_EXPORT_PRIVATE VmafAware : public TcpCubicSenderBase {
   friend class test::VmafAwarePeer;
 
   CubicBytes cubic_;
+
+  TransportType transport_;
 
   // ACK counter for the Reno implementation.
   uint64_t num_acked_packets_;

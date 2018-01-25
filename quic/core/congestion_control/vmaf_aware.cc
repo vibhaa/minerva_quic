@@ -34,9 +34,11 @@ VmafAware::VmafAware(
     bool reno,
     QuicPacketCount initial_tcp_congestion_window,
     QuicPacketCount max_congestion_window,
-    QuicConnectionStats* stats)
-    : TcpCubicSenderBase(clock, rtt_stats, reno, stats),
+    QuicConnectionStats* stats,
+    TransportType transport)
+    : TcpCubicSenderBase(clock, rtt_stats, reno || transport == transFast, stats),
       cubic_(clock),
+      transport_(transport),
       num_acked_packets_(0),
       congestion_window_(initial_tcp_congestion_window * kDefaultTCPMSS),
       min_congestion_window_(kDefaultMinimumCongestionWindow),
@@ -377,7 +379,8 @@ void VmafAware::MaybeIncreaseCwnd(
   }
 
   // uncomment this to run RENO or CUBIC and not FastTCP
-  SetWeight(CwndMultiplier());
+  if (transport_ == transReno || transport_ == transCubic)
+    SetWeight(CwndMultiplier());
 
   // Congestion avoidance.
   if (reno_) {
@@ -397,7 +400,8 @@ void VmafAware::MaybeIncreaseCwnd(
       
       congestion_window_ += (int64_t)(kDefaultTCPMSS);
       // Uncomment below line to run FastTCP
-      // UpdateCongestionWindow();
+      if (transport_ == transFast)
+        UpdateCongestionWindow();
       num_acked_packets_ = 0;
     }
     QUIC_DVLOG(1) << "Reno; congestion window: " << congestion_window_
@@ -430,7 +434,12 @@ void VmafAware::OnConnectionMigration() {
 }
 
 CongestionControlType VmafAware::GetCongestionControlType() const {
-  return kVMAFAware;
+  if (transport_ == transFast)
+    return kVMAFAwareFast;
+  else if (transport_ == transCubic)
+    return kVMAFAwareCubic;
+  else
+    return kVMAFAwareReno;
 }
 
 }  // namespace net

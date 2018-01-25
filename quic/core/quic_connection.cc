@@ -258,7 +258,18 @@ QuicConnection::QuicConnection(
           perspective,
           clock_,
           &stats_,
-          FLAGS_quic_reloadable_flag_quic_default_to_bbr ? kBBR : kCubicBytes,
+          GetQuicFlag(FLAGS_quic_reloadable_flag_quic_use_bbr) ? kBBR : 
+            GetQuicFlag(FLAGS_quic_reloadable_flag_quic_use_pcc) ? kPCC : 
+            GetQuicFlag(FLAGS_quic_reloadable_flag_quic_use_reno) ? kRenoBytes : 
+            GetQuicFlag(FLAGS_quic_default_to_vf_cubic) ? kValueFuncCubic : 
+            GetQuicFlag(FLAGS_quic_default_to_vf_reno) ? kValueFuncReno :  
+            GetQuicFlag(FLAGS_quic_default_to_vf_fast) ? kValueFuncFast :
+            GetQuicFlag(FLAGS_quic_default_to_vmaf_cubic) ? kVMAFAwareCubic : 
+            GetQuicFlag(FLAGS_quic_default_to_vmaf_reno) ? kVMAFAwareReno : 
+            GetQuicFlag(FLAGS_quic_default_to_vmaf_fast) ? kVMAFAwareFast : 
+            GetQuicFlag(FLAGS_quic_default_to_propss_cubic) ? kPropSSCubic : 
+            GetQuicFlag(FLAGS_quic_default_to_propss_fast) ? kPropSSFast : 
+            kCubicBytes,
           kNack),
       version_negotiation_state_(START_NEGOTIATION),
       perspective_(perspective),

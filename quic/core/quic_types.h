@@ -211,7 +211,10 @@ enum QuicPacketPrivateFlags {
 // (Reno and Cubic are the classic example for that).
 enum CongestionControlType { kCubicBytes, kRenoBytes, kBBR, kPCC,
     kPropSS, kPropSSCubic, kMaxPropRisk, kMPRCubic, kPropSSBBR,
-    kVMAFAware, kPropSSFast, kNUM, kValueFunc};
+    kVMAFAwareFast, kVMAFAwareCubic, kVMAFAwareReno, 
+    kPropSSFast, kNUM, kValueFuncCubic, kValueFuncFast, kValueFuncReno };
+
+enum TransportType { transFast, transCubic, transReno};
 
 enum LossDetectionType {
   kNack,          // Used to mimic TCP's loss detection.

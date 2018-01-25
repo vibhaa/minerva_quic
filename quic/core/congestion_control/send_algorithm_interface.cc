@@ -34,9 +34,6 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
     QuicPacketCount initial_congestion_window) {
   QuicPacketCount max_congestion_window = kDefaultMaxCongestionWindowPackets;
 
-  // Hardcode our choice of congestion control :O
-  congestion_control_type = kValueFunc;
-
   switch (congestion_control_type) {
     case kBBR:
       DLOG(INFO) << "Congestion control type is BBR";
@@ -70,12 +67,12 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
       DLOG(INFO) << "Congestion control type is Prop SS";
       return new PropSSTcpCubic(
           clock, rtt_stats, true /* use Reno */,
-          initial_congestion_window, max_congestion_window, stats);
+          initial_congestion_window, max_congestion_window, stats, transReno);
     case kPropSSCubic:
       DLOG(INFO) << "Congestion control type is Prop SS over Cubic";
       return new PropSSTcpCubic(
           clock, rtt_stats, false /* dont use Reno */,
-          initial_congestion_window, max_congestion_window, stats);
+          initial_congestion_window, max_congestion_window, stats, transCubic);
     case kMaxPropRisk:
       DLOG(INFO) << "Congestion control type is MaxPropRisk";
       return new MaxPropRisk(
@@ -86,21 +83,41 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
       return new MaxPropRisk(
           clock, rtt_stats, false /* don't use Reno */,
           initial_congestion_window, max_congestion_window, stats);
-    case kVMAFAware:
-      DLOG(INFO) << "Congestion control type is VMAFAware";
+    case kVMAFAwareReno:
+      DLOG(INFO) << "Congestion control type is VMAFAware with Reno";
+      return new VmafAware(
+          clock, rtt_stats, true /* don't use Reno */,
+          initial_congestion_window, max_congestion_window, stats, transReno);
+    case kVMAFAwareCubic:
+      DLOG(INFO) << "Congestion control type is VMAFAware with Cubic";
       return new VmafAware(
           clock, rtt_stats, false /* don't use Reno */,
-          initial_congestion_window, max_congestion_window, stats);
+          initial_congestion_window, max_congestion_window, stats, transCubic);
+    case kVMAFAwareFast:
+      DLOG(INFO) << "Congestion control type is VMAFAware with fastTCP";
+      return new VmafAware(
+          clock, rtt_stats, false /* don't use Reno */,
+          initial_congestion_window, max_congestion_window, stats, transFast);
     case kPropSSFast:
       DLOG(INFO) << "Congestion control type is PropSSFastTcp";
       return new PropSSFastTcp(
               clock, rtt_stats, initial_congestion_window,
-              max_congestion_window, stats);
-    case kValueFunc:
-      DLOG(INFO) << "Congestion control type is ValueFuncAware";
+              max_congestion_window, stats, transFast);
+    case kValueFuncReno:
+      DLOG(INFO) << "Congestion control type is ValueFuncAware over Reno";
       return new ValueFuncAware(
               clock, rtt_stats, initial_congestion_window,
-              max_congestion_window, stats, true);
+              max_congestion_window, stats, transReno);
+    case kValueFuncCubic:
+      DLOG(INFO) << "Congestion control type is ValueFuncAware over Cubic";
+      return new ValueFuncAware(
+              clock, rtt_stats, initial_congestion_window,
+              max_congestion_window, stats, transCubic);
+    case kValueFuncFast:
+      DLOG(INFO) << "Congestion control type is ValueFuncAware over fastTCP";
+      return new ValueFuncAware(
+              clock, rtt_stats, initial_congestion_window,
+              max_congestion_window, stats, transFast);
     case kNUM:
       DLOG(INFO) << "Congestion control type is NUM";
       return new NumSender(
