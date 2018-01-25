@@ -10,6 +10,7 @@
 #include <sstream>
 #include "net/quic/platform/api/quic_logging.h"
 
+#define VID_TRACES_DIR "/home/ubuntu/video_transport_simulator/video_traces/"
 namespace net {
 
 Video::Video():
@@ -36,7 +37,7 @@ void Video::set_screen_size(int ss) {
 }
 
 void Video::set_vid_prefix(std::string s) {
-	std::string vid_traces = "/tmp/vid_traces/";
+	std::string vid_traces = VID_TRACES_DIR;
 	set_video_file(vid_traces + s + ".dat");
 	set_vmaf_file(vid_traces + s + ".vmaf");
 	set_fit_file(vid_traces + s + ".fit");
@@ -72,6 +73,9 @@ void Video::set_video_file(std::string fname) {
 
 double Video::qoe(int __chunk_ix, double rate) { // rate in Kbps
 
+	DLOG(INFO) << "This function has been deprecated. Use vmaf_qoe instead";
+	assert(false);
+
 	assert(rate >= 0);
 
 	double qoe = 20.0 - 20.0 * exp(-3.0 * rate / ss_ / 4300.0);
@@ -81,11 +85,11 @@ double Video::qoe(int __chunk_ix, double rate) { // rate in Kbps
 
 double Video::vmaf_qoe(int chunk_ix, double rate) {
 
+	assert(vmafs_.size() > 0 && bitrates_.size() > 0);
+
 	chunk_ix = chunk_ix % vmafs_.size();
 
-	assert(vmafs_.size() > 0);
-
-	double qoe = -1;
+	double qoe = vmafs_[chunk_ix][bitrates_.size() - 1];
 
 	for (unsigned int i = 1; i < bitrates_.size(); ++i){
 
@@ -99,6 +103,7 @@ double Video::vmaf_qoe(int chunk_ix, double rate) {
 		break;
 	  }
 	}
+	
 	return qoe;
 }
 
