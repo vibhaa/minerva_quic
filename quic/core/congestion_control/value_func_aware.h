@@ -49,7 +49,9 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
   QuicByteCount GetSlowStartThreshold() const override;
   CongestionControlType GetCongestionControlType() const override;
   // End implementation of SendAlgorithmInterface.
-  void UpdateCongestionWindow();
+  double CwndMultiplier();
+  void UpdateCwndFastTCP();
+  void SetWeight(float weight);
   QuicByteCount min_congestion_window() const { return min_congestion_window_; }
 
  protected:

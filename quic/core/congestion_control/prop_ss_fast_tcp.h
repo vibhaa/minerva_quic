@@ -109,6 +109,10 @@ class QUIC_EXPORT_PRIVATE PropSSFastTcp : public TcpCubicSenderBase {
   double cur_buffer_estimate_;
 
   QuicWallTime start_time_;
+  
+  // Handle of the log file we write to, so we don't reopen the file
+  // on every ack that we get.
+  std::ofstream bw_log_file_;
 
   DISALLOW_COPY_AND_ASSIGN(PropSSFastTcp);
 };

@@ -143,6 +143,10 @@ class QUIC_EXPORT_PRIVATE VmafAware : public TcpCubicSenderBase {
   double log_prev_rate;
 
   QuicByteCount accum_acked_bytes;
+  
+  // Handle of the log file we write to, so we don't reopen the file
+  // on every ack that we get.
+  std::ofstream bw_log_file_;
 
   DISALLOW_COPY_AND_ASSIGN(VmafAware);
 };

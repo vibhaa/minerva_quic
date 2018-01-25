@@ -51,7 +51,6 @@ ValueFuncAware::ValueFuncAware(
       start_time_(clock->WallNow()),
       use_fast_tcp_(use_fast_tcp),
       bw_log_file_() {
-         bw_log_file_.open("quic_bw_value_func_aware.log", std::ios::app);
       }
 
 ValueFuncAware::~ValueFuncAware() {
@@ -183,63 +182,72 @@ QuicByteCount ValueFuncAware::GetSlowStartThreshold() const {
   return slowstart_threshold_;
 }
 
-void ValueFuncAware::UpdateCongestionWindow() {
-    double gamma = 0.8;
+double ValueFuncAware::CwndMultiplier() {
     DLOG(INFO) << "Updating congestion window";
-    if (client_data_ != nullptr) {
-        QuicByteCount cs = client_data_->get_chunk_remainder();
-        double buf = client_data_->get_buffer_estimate();
-        QuicBandwidth rate = client_data_->get_latest_rate_estimate();
-        double rebuf_time = 100.0;
-        if (rate.ToBytesPerSecond() > 0) { 
-            buf -= ((double)cs)/rate.ToBytesPerSecond();
-            if (buf < 0) {
-                rebuf_time = -buf;
-                buf = 0.0;
-            } else {
-                rebuf_time = 0.0;
-            }
-        }
-        DLOG(INFO) << "Chunk remainder (bytes) = " << cs
-            << ", buffer = " << buf
-            << ", ss = " << client_data_->get_screen_size()
-            << ", chunk_ix = " << client_data_->get_chunk_index()
-            << ", rate estimate = " << rate.ToKBitsPerSecond();
-        DLOG(INFO) << "current bitrate " << client_data_->current_bitrate()
-            << ", prev bitrate " << client_data_->prev_bitrate();
-        double cur_qoe = client_data_->qoe(client_data_->current_bitrate(), rebuf_time,
-            client_data_->prev_bitrate());
-        buf += 4.0;
-        double value = client_data_->get_value_func()->ValueFor(
-                buf, ((double)rate.ToBitsPerSecond())/(1000.0 * 1000.0),
-                client_data_->current_bitrate());
-        double avg_est_qoe = (client_data_->get_past_qoe() + cur_qoe + value) /
-                (client_data_->get_chunk_index() + 1 + client_data_->get_value_func()->Horizon());
-        DLOG(INFO) << "Past qoe = " << client_data_->get_past_qoe()
-            << ", cur chunk qoe = " << cur_qoe
-            << ", value = " << value
-            << ", ss = " << client_data_->get_screen_size()
-            << ", avg est qoe = " << avg_est_qoe; 
-        // QOEs are within [-5, 20] so use a sigmoid centered at 8 such that values in this range
-        // are more or less linear. Scale so that the adjusted values are in [0, 10].
-        double adjusted_avg_qoe = 10.0/(1 + exp((8-avg_est_qoe)*2/12));
-        double target;
-        if (client_data_->get_chunk_index() >= 1) {
-            // The target now lies in [30/11, 30/1] = [2.7, 30].
-            target = 15.0 * rate.ToKBitsPerSecond()/(1000.0 * (1 + adjusted_avg_qoe));
-        } else {
-            target = 5.0 * client_data_->get_screen_size();
-        }
-        DLOG(INFO) << "Adjusted avg qoe w/ sigmoid = " << adjusted_avg_qoe
-            << ", target (packets) = " << target;
-        //QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(start_time_);
-        //int epoch = time_elapsed.ToMilliseconds() / 30000;
-        double minrtt = rtt_stats_->min_rtt().ToMilliseconds();
-        double new_wnd = (minrtt / rtt_stats_->latest_rtt().ToMilliseconds()) * congestion_window_ +
-           target * kDefaultTCPMSS; 
-        congestion_window_ = (int)((1 - gamma) * congestion_window_ + gamma * new_wnd);
-        DLOG(INFO) << "Updating congestion window for ss " << client_data_->get_screen_size() << " window " << congestion_window_;
+    if (client_data_ == nullptr) {
+        return 1.0;
     }
+    QuicByteCount cs = client_data_->get_chunk_remainder();
+    double buf = client_data_->get_buffer_estimate();
+    QuicBandwidth rate = client_data_->get_latest_rate_estimate();
+    double rebuf_time = 100.0;
+    if (rate.ToBytesPerSecond() > 0) { 
+        buf -= ((double)cs)/rate.ToBytesPerSecond();
+        if (buf < 0) {
+            rebuf_time = -buf;
+            buf = 0.0;
+        } else {
+            rebuf_time = 0.0;
+        }
+    }
+    DLOG(INFO) << "Chunk remainder (bytes) = " << cs
+        << ", buffer = " << buf
+        << ", ss = " << client_data_->get_screen_size()
+        << ", chunk_ix = " << client_data_->get_chunk_index()
+        << ", rate estimate = " << rate.ToKBitsPerSecond();
+    DLOG(INFO) << "current bitrate " << client_data_->current_bitrate()
+        << ", prev bitrate " << client_data_->prev_bitrate();
+    double cur_qoe = client_data_->qoe(client_data_->current_bitrate(), rebuf_time,
+        client_data_->prev_bitrate());
+    buf += 4.0;
+    double value = client_data_->get_value_func()->ValueFor(
+            buf, ((double)rate.ToBitsPerSecond())/(1000.0 * 1000.0),
+            client_data_->current_bitrate());
+    double avg_est_qoe = (client_data_->get_past_qoe() + cur_qoe + value) /
+            (client_data_->get_chunk_index() + 1 + client_data_->get_value_func()->Horizon());
+    DLOG(INFO) << "Past qoe = " << client_data_->get_past_qoe()
+        << ", cur chunk qoe = " << cur_qoe
+        << ", value = " << value
+        << ", ss = " << client_data_->get_screen_size()
+        << ", avg est qoe = " << avg_est_qoe; 
+    // QOEs are within [-5, 20] so use a sigmoid centered at 8 such that values in this range
+    // are more or less linear. Scale so that the adjusted values are in [0, 10].
+    double adjusted_avg_qoe = 10.0/(1 + exp((8-avg_est_qoe)*2/12));
+    double target;
+    if (client_data_->get_chunk_index() >= 1) {
+        // The target now lies in [30/11, 30/1] = [2.7, 30].
+        target = 3.0 * rate.ToKBitsPerSecond()/(1000.0 * (1 + adjusted_avg_qoe));
+    } else {
+        target = client_data_->get_screen_size();
+    }
+    DLOG(INFO) << "Adjusted avg qoe w/ sigmoid = " << adjusted_avg_qoe
+        << ", target (packets) = " << target;
+    return target;
+}
+
+void ValueFuncAware::UpdateCwndFastTCP() {
+    double target = 5.0 * weight_;
+    double gamma = 0.8;
+    double minrtt = rtt_stats_->min_rtt().ToMilliseconds();
+    double new_wnd = (minrtt / rtt_stats_->latest_rtt().ToMilliseconds()) * congestion_window_ +
+       target * kDefaultTCPMSS; 
+    congestion_window_ = (int)((1 - gamma) * congestion_window_ + gamma * new_wnd);
+    DLOG(INFO) << "Updating congestion window for ss " << client_data_->get_screen_size() << " window " << congestion_window_;
+}
+
+void ValueFuncAware::SetWeight(float weight) {
+  TcpCubicSenderBase::SetWeight(weight);
+  cubic_.SetWeight(weight);
 }
 
 // Called when we receive an ack. Normal TCP tracks how many packets one ack
@@ -251,6 +259,10 @@ void ValueFuncAware::MaybeIncreaseCwnd(
     QuicTime event_time) {
 
     if (client_data_ != nullptr) {
+        if (!bw_log_file_.is_open()) {
+            std::string filename = "quic_bw_vf_" + std::to_string(client_data_->get_client_id()) + ".log";
+            bw_log_file_.open(filename, std::ios::trunc);
+        }
         double ss = client_data_->get_screen_size();
         QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_time_);
         if (ss > 0 && time_elapsed > rtt_stats_->smoothed_rtt()) { 
@@ -264,17 +276,12 @@ void ValueFuncAware::MaybeIncreaseCwnd(
                        << ", \"screen_size\": " << ss
                        << "}\n";
         }
-        // This is how we tell if we got a new chunk request.
-        if (client_data_->get_buffer_estimate() != cur_buffer_estimate_) {
-            DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<
-                BandwidthEstimate().ToDebugValue();
-            cur_buffer_estimate_ = client_data_->get_buffer_estimate();
-        }
     }
     else {
       DLOG(INFO) << "ack without client data";
     }
-  
+
+    
   QUIC_BUG_IF(InRecovery()) << "Never increase the CWND during recovery.";
   // Do not increase the congestion window unless the sender is close to using
   // the current window.
@@ -292,15 +299,28 @@ void ValueFuncAware::MaybeIncreaseCwnd(
                   << " slowstart threshold: " << slowstart_threshold_;
     return;
   }
+
+  // Adjust the CWND multiplier as needed. Works better on Reno than 
+  double multiplier = CwndMultiplier();
+  SetWeight(multiplier);
+  
+   ++num_acked_packets_;
   // Congestion avoidance.
-  if (reno_) {
+  if (use_fast_tcp_) {
+     // Update cwnd once every RTT, like for reno
+     // TODO(vikram): what if we do this on every ack? Too much?
+     if (num_acked_packets_ * num_connections_ >=
+          congestion_window_ / kDefaultTCPMSS) {
+        UpdateCwndFastTCP();
+        num_acked_packets_ = 0;
+     }
+  } else if (reno_) {
     // Classic Reno congestion avoidance.
-    ++num_acked_packets_;
     // Divide by num_connections to smoothly increase the CWND at a faster rate
     // than conventional Reno.
-    if (num_acked_packets_ * num_connections_ >=
+    if (num_acked_packets_ * multiplier >=
         congestion_window_ / kDefaultTCPMSS) {
-      UpdateCongestionWindow();
+      congestion_window_ += int(kDefaultTCPMSS);
       num_acked_packets_ = 0;
     }
 

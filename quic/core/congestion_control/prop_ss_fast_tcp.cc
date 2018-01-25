@@ -47,7 +47,8 @@ PropSSFastTcp::PropSSFastTcp(
       client_data_(nullptr),
       last_time_(QuicWallTime::Zero()),
       cur_buffer_estimate_(-1.0),
-      start_time_(clock->WallNow()) {}
+      start_time_(clock->WallNow()),
+      bw_log_file_() {}
 
 PropSSFastTcp::~PropSSFastTcp() {}
 
@@ -205,14 +206,16 @@ void PropSSFastTcp::MaybeIncreaseCwnd(
     QuicByteCount prior_in_flight,
     QuicTime event_time) {
 
-    std::ofstream bw_log_file;
-    bw_log_file.open("quic_bw_prop_ss.log", std::ios::app);
     if (client_data_ != nullptr) {
+        if (!bw_log_file_.is_open()) {
+            std::string filename = "quic_bw_vf_" + std::to_string(client_data_->get_client_id()) + ".log";
+            bw_log_file_.open(filename, std::ios::trunc);
+        }
         double ss = client_data_->get_screen_size();
         QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_time_);
         if (ss > 0 && time_elapsed > rtt_stats_->smoothed_rtt()) { 
               last_time_ = clock_->WallNow();
-              bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
+              bw_log_file_ << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
                        << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
                        << ", \"clientId\": " << client_data_->get_client_id()
                        << ", \"bandwidth_Mbps\": " << client_data_->get_latest_rate_estimate().ToKBitsPerSecond()/1000.0
@@ -231,7 +234,6 @@ void PropSSFastTcp::MaybeIncreaseCwnd(
     else {
       DLOG(INFO) << "ack without client data";
     }
-    bw_log_file.close();
   
   QUIC_BUG_IF(InRecovery()) << "Never increase the CWND during recovery.";
   // Do not increase the congestion window unless the sender is close to using
