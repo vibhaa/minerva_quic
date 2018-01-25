@@ -244,20 +244,20 @@ double VmafAware::QoeBasedWeight(double prev_rate) {
                                                         fmax(prev_rate / 1e3, 10)); // min with 10 Kbps
     DLOG(INFO) << "qoe : " << qoe;
 
-    double vmaf_weight = (prev_rate / qoe) * 3.77 / 300.0 / 1e3; //cwnd is in bytes
+    double vmaf_weight = (prev_rate / qoe) * 3.77 / (300* 1e3); //cwnd is in bytes
 
     return vmaf_weight;
 }
 
 double VmafAware::FitConstantWeight(double prev_rate) {
 
-    double vmaf_weight = (prev_rate / client_data_-> get_vid() -> get_fit_constant());
+    double vmaf_weight = (prev_rate / client_data_-> get_vid() -> get_fit_constant())* 1.0 / (300* 1e3);
 
     return vmaf_weight;
 }
 
 double VmafAware::FitBasedWeight(double prev_rate) {
-    double vmaf_weight = (prev_rate / client_data_-> get_vid() -> get_fit_at(prev_rate / 1e3)) * 3.77/ 300./ 5.;
+    double vmaf_weight = (prev_rate / client_data_-> get_vid() -> get_fit_at(prev_rate / 1e3))* 5./ (300* 1e3);
 
     return vmaf_weight;
 }
@@ -294,7 +294,6 @@ double VmafAware::CwndMultiplier() {
                                                                         << client_data_->get_buffer_estimate();
     DLOG(INFO) << "rtt is in ms " << rtt_stats_->latest_rtt().ToMilliseconds() << " last window is "
                                                                  << congestion_window_;
-
 
     if ( past_weight_ < 0 || time_elapsed >= QuicTime::Delta::FromMilliseconds(MILLI_SECONDS_LAG)) {
         past_weight_ = weight;
