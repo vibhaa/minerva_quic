@@ -1,9 +1,10 @@
 HTTP/1.0 200 OK
-Server: cloudflare-quic
-Date: Wed, 08 Nov 2017 21:19:57 GMT
+Server: SimpleHTTP/0.6 Python/2.7.12
+Date: Thu, 25 Jan 2018 03:43:21 GMT
 Content-type: text/html
-Content-Length: 1504
+Content-Length: 2075
 X-Original-URL: https://www.example3.org/BigBuckBunny/myindex_fastMPC2.html
+Last-Modified: Wed, 24 Jan 2018 23:47:02 GMT
 
 <!doctype html>
 <html>
@@ -39,7 +40,6 @@ X-Original-URL: https://www.example3.org/BigBuckBunny/myindex_fastMPC2.html
                 player.setStableBufferTime(60);
                 player.setBufferToKeep(60);
                 player.setBufferPruningInterval(60);
-
                 
                 player.initialize(document.querySelector("#videoPlayer"), url, true);
 
@@ -48,8 +48,8 @@ X-Original-URL: https://www.example3.org/BigBuckBunny/myindex_fastMPC2.html
                 }
                 player.setAbrAlgorithm(abr_id);
                 player.setScreenSize(2);
-    			player.setVideoFile('BigBuckBunny');
                 player.setClientID(Number(clientId));
+    			player.setVideoFile('BigBuckBunny');
 
                 if ( abr_id in abr_algorithms ) {
                     document.title = abr_algorithms[abr_id];
