@@ -73,9 +73,6 @@ void Video::set_video_file(std::string fname) {
 
 double Video::qoe(int __chunk_ix, double rate) { // rate in Kbps
 
-	DLOG(INFO) << "This function has been deprecated. Use vmaf_qoe instead";
-	assert(false);
-
 	assert(rate >= 0);
 
 	double qoe = 20.0 - 20.0 * exp(-3.0 * rate / ss_ / 4300.0);
@@ -85,25 +82,29 @@ double Video::qoe(int __chunk_ix, double rate) { // rate in Kbps
 
 double Video::vmaf_qoe(int chunk_ix, double rate) {
 
-	assert(vmafs_.size() > 0 && bitrates_.size() > 0);
+	assert(vmafs_.size() > 0 && bitrates_.size() > 0 && rate >= 0);
 
 	chunk_ix = chunk_ix % vmafs_.size();
 
+	double prev_bitrate = 0, prev_vmaf = 0;
+
 	double qoe = vmafs_[chunk_ix][bitrates_.size() - 1];
 
-	for (unsigned int i = 1; i < bitrates_.size(); ++i){
+	for (unsigned int i = 0; i < bitrates_.size(); ++i){
 
-	  if ( rate <= bitrates_[i] ) {
+	  if ( rate <= bitrates_[i] ){
 
-		qoe = vmafs_[chunk_ix][i-1];
+		qoe = prev_vmaf;
 
-		qoe += ((vmafs_[chunk_ix][i] - vmafs_[chunk_ix][i-1]) / (bitrates_[i] - bitrates_[i-1]))
+		qoe += ((vmafs_[chunk_ix][i] - prev_vmaf) / (bitrates_[i] - prev_bitrate))
 				 * (bitrates_[i] - rate);
 
 		break;
 	  }
+	  prev_vmaf = vmafs_[chunk_ix][i];
+	  prev_bitrate = bitrates_[i];
 	}
-	
+
 	return qoe;
 }
 

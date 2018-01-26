@@ -79,6 +79,7 @@ class QUIC_EXPORT_PRIVATE VmafAware : public TcpCubicSenderBase {
 
   double CwndMultiplier();
 
+  void ReadArgs();
   double RiskWeight(double prev_rate);
   double QoeBasedWeight(double prev_rate);
   double FitConstantWeight(double prev_rate);
@@ -146,6 +147,8 @@ class QUIC_EXPORT_PRIVATE VmafAware : public TcpCubicSenderBase {
   double log_prev_rate;
 
   QuicByteCount accum_acked_bytes;
+
+  std::string option_;
   
   // Handle of the log file we write to, so we don't reopen the file
   // on every ack that we get.

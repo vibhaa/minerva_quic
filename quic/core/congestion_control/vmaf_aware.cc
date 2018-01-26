@@ -19,6 +19,9 @@
 #include "net/quic/platform/api/quic_flags.h"
 #include "net/quic/platform/api/quic_logging.h"
 
+#define PERCEPTUAL_QOE "perceptual_qoe"
+#define FIT_SS "fit_ss"
+
 namespace net {
 
 namespace {
@@ -59,7 +62,9 @@ VmafAware::VmafAware(
       log_multiplier(-1), 
       log_prev_rate(-1),
       accum_acked_bytes(0),
-      bw_log_file_() {}
+      bw_log_file_(){
+        ReadArgs();
+      }
 
 VmafAware::~VmafAware() {}
 
@@ -223,6 +228,10 @@ QuicByteCount VmafAware::GetSlowStartThreshold() const {
   return slowstart_threshold_;
 }
 
+void VmafAware::ReadArgs() {
+  std::ifstream f("/tmp/quic-args.txt");
+  f >> option_;
+}
 
 double VmafAware::RiskWeight(double prev_rate) {
   // risk calculation
@@ -240,29 +249,29 @@ double VmafAware::RiskWeight(double prev_rate) {
 }
 
 double VmafAware::QoeBasedWeight(double prev_rate) {    
-    double qoe = client_data_ -> get_video() -> qoe(client_data_ -> get_chunk_index(),
+    double qoe = client_data_ -> get_video() -> vmaf_qoe(client_data_ -> get_chunk_index(),
                                                         fmax(prev_rate / 1e3, 10)); // min with 10 Kbps
     DLOG(INFO) << "qoe : " << qoe;
 
-    double vmaf_weight = (prev_rate / qoe) * 3.77 / (300* 1e3); //cwnd is in bytes
+    assert(qoe > 0);
+
+    double vmaf_weight = (prev_rate / (qoe/ 5.)) *3.77 / (300* 1e3);
 
     return vmaf_weight;
 }
 
 double VmafAware::FitConstantWeight(double prev_rate) {
 
-    double vmaf_weight = (prev_rate / client_data_-> get_vid() -> get_fit_constant())* 1.0 / (300* 1e3);
-
-    return vmaf_weight;
+    return client_data_ -> get_vid() -> get_fit_constant();
 }
 
-double VmafAware::FitBasedWeight(double prev_rate) {
-    double vmaf_weight = (prev_rate / client_data_-> get_vid() -> get_fit_at(prev_rate / 1e3))* 5./ (300* 1e3);
+// double VmafAware::FitBasedWeight(double prev_rate) {
+//     double vmaf_weight = (prev_rate / client_data_-> get_vid() -> get_fit_at(prev_rate / 1e3))* 5./ (300* 1e3);
 
-    return vmaf_weight;
-}
+//     return vmaf_weight;
+// }
 
-const double MILLI_SECONDS_LAG = 500;
+const double MILLI_SECONDS_LAG = 2000.0;
 
 double VmafAware::CwndMultiplier() {
 
@@ -277,7 +286,15 @@ double VmafAware::CwndMultiplier() {
     assert(prev_rate >= 0);
 
     // Figure out the weight to set here
-    double vmaf_weight = QoeBasedWeight(prev_rate);
+    double vmaf_weight;
+    if (option_ == PERCEPTUAL_QOE)
+       vmaf_weight = QoeBasedWeight(prev_rate);
+    else if (option_ == FIT_SS)
+        vmaf_weight = FitConstantWeight(prev_rate);
+    else{
+        DLOG(INFO) << "Incorrect case specified";
+        assert(false);
+    }
 
     DLOG(INFO) << " screen size = " << client_data_ -> get_screen_size() 
                 << ", vmaf weight is " << vmaf_weight;
