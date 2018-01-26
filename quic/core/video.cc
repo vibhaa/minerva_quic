@@ -92,12 +92,12 @@ double Video::vmaf_qoe(int chunk_ix, double rate) {
 
 	for (unsigned int i = 0; i < bitrates_.size(); ++i){
 
-	  if ( rate <= bitrates_[i] ){
+	  if ( rate < bitrates_[i] ){
 
 		qoe = prev_vmaf;
 
 		qoe += ((vmafs_[chunk_ix][i] - prev_vmaf) / (bitrates_[i] - prev_bitrate))
-				 * (bitrates_[i] - rate);
+				 * (rate - prev_bitrate);
 
 		break;
 	  }
