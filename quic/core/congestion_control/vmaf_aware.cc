@@ -251,7 +251,7 @@ double VmafAware::QoeBasedWeight(double prev_rate) {
     double qoe = client_data_ -> get_video() -> vmaf_qoe(client_data_ -> get_chunk_index(), prev_rate / 1e3); // min with 10 Kbps
     DLOG(INFO) << "qoe : " << qoe;
 
-    assert(qoe > 0);
+    assert(qoe >= 0);
 
     double vmaf_weight = (prev_rate / (qoe/ 5.)) *3.77 / (300* 1e3);
 
@@ -305,7 +305,7 @@ double VmafAware::CwndMultiplier() {
 
     if (client_data_->get_chunk_index() < 1) weight = 1.0;
 
-    assert(weight >= 0); assert(client_data_ -> get_screen_size() > 0);
+    assert(weight > 0); assert(client_data_ -> get_screen_size() > 0);
 
     DLOG(INFO) << "chunk remainder is " << client_data_->get_chunk_remainder() << " (in Bytes). Buffer is " 
                                                                         << client_data_->get_buffer_estimate();
