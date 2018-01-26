@@ -229,7 +229,7 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     double target;
     if (client_data_->get_chunk_index() >= 1) {
         // The target now lies in [30/11, 30/1] = [2.7, 30].
-        target = 10.0 * rate.ToKBitsPerSecond()/(1000.0 * (1 + adjusted_avg_qoe));
+        target = 10.0 * rate.ToKBitsPerSecond()/(1000.0 * (adjusted_avg_qoe));
     } else {
         target = client_data_->get_screen_size();
     }
