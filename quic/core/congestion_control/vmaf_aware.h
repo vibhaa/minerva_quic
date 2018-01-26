@@ -79,6 +79,7 @@ class QUIC_EXPORT_PRIVATE VmafAware : public TcpCubicSenderBase {
 
   double CwndMultiplier();
 
+  void UpdateWithAck(QuicByteCount acked_bytes) override;
   void ReadArgs();
   double RiskWeight(double prev_rate);
   double QoeBasedWeight(double prev_rate);
@@ -145,8 +146,6 @@ class QUIC_EXPORT_PRIVATE VmafAware : public TcpCubicSenderBase {
   double log_multiplier;
 
   double log_prev_rate;
-
-  QuicByteCount accum_acked_bytes;
 
   std::string option_;
   

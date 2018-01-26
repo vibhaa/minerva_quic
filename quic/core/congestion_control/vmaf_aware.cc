@@ -61,7 +61,6 @@ VmafAware::VmafAware(
       bandwidth_ix_(0), 
       log_multiplier(-1), 
       log_prev_rate(-1),
-      accum_acked_bytes(0),
       bw_log_file_(){
         ReadArgs();
       }
@@ -233,20 +232,20 @@ void VmafAware::ReadArgs() {
   f >> option_;
 }
 
-double VmafAware::RiskWeight(double prev_rate) {
-  // risk calculation
-    double risk_rate = 0;
-    double buf_est = client_data_->get_buffer_estimate();
-    if (buf_est > 0) {
-      risk_rate = 8 * client_data_->get_chunk_remainder() / buf_est; // TODO: prevent division error
-    }
+// double VmafAware::RiskWeight(double prev_rate) {
+//   // risk calculation
+//     double risk_rate = 0;
+//     double buf_est = client_data_->get_buffer_estimate();
+//     if (buf_est > 0) {
+//       risk_rate = 8 * client_data_->get_chunk_remainder() / buf_est; // TODO: prevent division error
+//     }
 
-    double risk_weight = risk_rate / prev_rate * past_weight_;
+//     double risk_weight = risk_rate / prev_rate * past_weight_;
 
-    DLOG(INFO) << "risk weight is " << risk_weight;
+//     DLOG(INFO) << "risk weight is " << risk_weight;
 
-    return risk_weight;
-}
+//     return risk_weight;
+// }
 
 double VmafAware::QoeBasedWeight(double prev_rate) {    
     double qoe = client_data_ -> get_video() -> vmaf_qoe(client_data_ -> get_chunk_index(),
@@ -276,7 +275,7 @@ const double MILLI_SECONDS_LAG = 2000.0;
 double VmafAware::CwndMultiplier() {
 
     QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_weight_update_time_);
-    double prev_rate = 8 * accum_acked_bytes / ((time_elapsed.ToMilliseconds()) / 1000.0); // units : bps
+    double prev_rate = client_data_->get_latest_rate_estimate().ToKBitsPerSecond() * 1e3; // units : bps
 
     if ( time_elapsed.ToMilliseconds() == 0 ) {
         return past_weight_;
@@ -299,7 +298,8 @@ double VmafAware::CwndMultiplier() {
     DLOG(INFO) << " screen size = " << client_data_ -> get_screen_size() 
                 << ", vmaf weight is " << vmaf_weight;
 
-    double weight = std::max(vmaf_weight, RiskWeight(prev_rate));
+    // double weight = std::max(vmaf_weight, RiskWeight(prev_rate));
+    double weight = vmaf_weight;
     
     weight = fmin(weight, 5);
 
@@ -315,7 +315,6 @@ double VmafAware::CwndMultiplier() {
     if ( past_weight_ < 0 || time_elapsed >= QuicTime::Delta::FromMilliseconds(MILLI_SECONDS_LAG)) {
         past_weight_ = weight;
         last_weight_update_time_ = clock_->WallNow();
-        accum_acked_bytes = 0;
         log_multiplier = weight;
         log_prev_rate = prev_rate;
     }
@@ -332,6 +331,11 @@ void VmafAware::UpdateCongestionWindow() {
     congestion_window_ = (int)((1-gamma) * congestion_window_ + gamma * new_wnd);
 }
 
+void VmafAware::UpdateWithAck(QuicByteCount acked_bytes) {
+    if (client_data_ != nullptr) {
+        client_data_->record_acked_bytes(acked_bytes);
+    }
+}
 // Called when we receive an ack. Normal TCP tracks how many packets one ack
 // represents, but quic has a separate ack for each packet.
 void VmafAware::MaybeIncreaseCwnd(
@@ -360,13 +364,8 @@ void VmafAware::MaybeIncreaseCwnd(
                  << ", \"multiplier\": " << log_multiplier
                  << ", \"prev_rate\": " << log_prev_rate
                  << ", \"past_weight\": " << past_weight_
-                 << ", \"accum_acked_bytes\": " << accum_acked_bytes
                  << "}\n";
         }
-
-        client_data_->record_acked_bytes(acked_bytes);
-        accum_acked_bytes += acked_bytes;
-        assert(acked_bytes >= 0);
         // This is how we tell if we got a new chunk request.
         if (client_data_->get_buffer_estimate() != cur_buffer_estimate_) {
         DLOG(INFO) << "New chunk. Screen size: " << ss << ", bandwidth " <<
