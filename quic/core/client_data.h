@@ -30,6 +30,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   QuicBandwidth get_latest_rate_estimate();
   double get_buffer_estimate();
   double get_screen_size();
+  void set_bw_measurement_interval(QuicTime::Delta interval);
   // Returns true if a new bandwidth estimate is available.
   void record_acked_bytes(QuicByteCount x);
   void set_buffer_estimate(double current_buffer);

@@ -49,7 +49,7 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
   QuicByteCount GetSlowStartThreshold() const override;
   CongestionControlType GetCongestionControlType() const override;
   // End implementation of SendAlgorithmInterface.
-  double CwndMultiplier();
+  void UpdateCwndMultiplier();
   void UpdateCwndFastTCP();
   void SetWeight(float weight);
   QuicByteCount min_congestion_window() const { return min_congestion_window_; }
@@ -111,7 +111,15 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
   QuicWallTime last_time_;
   
   // Current buffer estimate from the client.
-  double cur_buffer_estimate_;
+  double multiplier_;
+
+  QuicWallTime last_weight_update_time_;
+
+  // The time over which we compute a rate.
+  QuicTime::Delta rate_measurement_interval_;
+
+  // The speed at which we have the weight reach its new value.
+  QuicTime::Delta weight_update_horizon_; 
 
   QuicWallTime start_time_;
 
