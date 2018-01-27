@@ -82,7 +82,9 @@ double Video::qoe(int __chunk_ix, double rate) { // rate in Kbps
 
 double Video::vmaf_qoe(int chunk_ix, double rate) {
 
-	assert(vmafs_.size() > 0 && bitrates_.size() > 0 && rate >= 0);
+	assert(vmafs_.size() > 0);
+	assert(bitrates_.size() > 0);
+	assert(rate >= 0);
 
 	chunk_ix = chunk_ix % vmafs_.size();
 

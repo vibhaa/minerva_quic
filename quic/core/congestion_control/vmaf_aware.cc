@@ -21,6 +21,7 @@
 
 #define PERCEPTUAL_QOE "perceptual_qoe"
 #define FIT_SS "fit_ss"
+#define USE_RISK "use_risk"
 
 namespace net {
 
@@ -229,26 +230,38 @@ QuicByteCount VmafAware::GetSlowStartThreshold() const {
 
 void VmafAware::ReadArgs() {
   std::ifstream f("/tmp/quic-args.txt");
-  f >> option_;
+  std::string t;
+  while(f >> t) {
+    read_options.push_back(t);
+  }
 }
 
-// double VmafAware::RiskWeight(double prev_rate) {
-//   // risk calculation
-//     double risk_rate = 0;
-//     double buf_est = client_data_->get_buffer_estimate();
-//     if (buf_est > 0) {
-//       risk_rate = 8 * client_data_->get_chunk_remainder() / buf_est; // TODO: prevent division error
-//     }
+bool VmafAware::isOption(std::string s) {
+  for(unsigned int i = 0; i < read_options.size(); ++i) {
+    if (read_options[i] == s) {
+      return true;
+    }
+  }
+  return false;
+}
 
-//     double risk_weight = risk_rate / prev_rate * past_weight_;
+double VmafAware::RiskWeight(double prev_rate) {
+  // risk calculation
+    double risk_rate = 0;
+    double buf_est = client_data_->get_buffer_estimate();
+    if (buf_est > 0) {
+      risk_rate = 8 * client_data_->get_chunk_remainder() / buf_est; // TODO: prevent division error
+    }
 
-//     DLOG(INFO) << "risk weight is " << risk_weight;
+    double risk_weight = risk_rate / prev_rate * past_weight_;
 
-//     return risk_weight;
-// }
+    DLOG(INFO) << "risk weight is " << risk_weight;
+
+    return risk_weight;
+}
 
 double VmafAware::QoeBasedWeight(double prev_rate) {
-    double qoe = client_data_ -> get_video() -> vmaf_qoe(client_data_ -> get_chunk_index(), prev_rate / 1e3); // min with 10 Kbps
+    double qoe = client_data_ -> get_video() -> vmaf_qoe(client_data_ -> get_chunk_index(), prev_rate / 1e3);
     DLOG(INFO) << "qoe : " << qoe;
 
     assert(qoe >= 0);
@@ -285,20 +298,23 @@ double VmafAware::CwndMultiplier() {
 
     // Figure out the weight to set here
     double vmaf_weight;
-    if (option_ == PERCEPTUAL_QOE)
+    if (isOption(PERCEPTUAL_QOE))
        vmaf_weight = QoeBasedWeight(prev_rate);
-    else if (option_ == FIT_SS)
+    else if (isOption(FIT_SS))
         vmaf_weight = FitConstantWeight(prev_rate);
     else{
         DLOG(INFO) << "Incorrect case specified";
         assert(false);
     }
 
+    double weight = vmaf_weight;
+    
+    if (isOption(USE_RISK))
+      weight = std::max(vmaf_weight, RiskWeight(prev_rate));
+
     DLOG(INFO) << " screen size = " << client_data_ -> get_screen_size() 
                 << ", vmaf weight is " << vmaf_weight;
 
-    // double weight = std::max(vmaf_weight, RiskWeight(prev_rate));
-    double weight = vmaf_weight;
     
     weight = fmax(weight, 0.5);
     weight = fmin(weight, 5);

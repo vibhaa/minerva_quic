@@ -85,6 +85,7 @@ class QUIC_EXPORT_PRIVATE VmafAware : public TcpCubicSenderBase {
   double QoeBasedWeight(double prev_rate);
   double FitConstantWeight(double prev_rate);
   double FitBasedWeight(double prev_rate);
+  bool isOption(std::string s);
 
   // This is the fast TCP update rule.
   void UpdateCongestionWindow();
@@ -147,7 +148,7 @@ class QUIC_EXPORT_PRIVATE VmafAware : public TcpCubicSenderBase {
 
   double log_prev_rate;
 
-  std::string option_;
+  std::vector<std::string> read_options;
   
   // Handle of the log file we write to, so we don't reopen the file
   // on every ack that we get.
