@@ -52,7 +52,7 @@ void ClientData::reset_bw_measurement() {
     bytes_since_last_measurement_ = 0;
 }
 
-void ClientData::update_chunk_remainder(QuicByteCount x) {
+bool ClientData::update_chunk_remainder(QuicByteCount x) {
     chunk_remainder_ -= (int64_t)x;
     chunk_remainder_ = fmax(0, chunk_remainder_);
     last_record_time_ = clock_->WallNow();
@@ -61,7 +61,9 @@ void ClientData::update_chunk_remainder(QuicByteCount x) {
         QuicBandwidth meas = QuicBandwidth::FromBytesAndTimeDelta(bytes_since_last_measurement_, interval);
         bw_measurements_.push_back(meas);
         reset_bw_measurement();
+        return true;
     }
+    return false;
 }
 
 QuicByteCount ClientData::get_chunk_remainder() {
@@ -79,9 +81,31 @@ QuicBandwidth ClientData::get_latest_rate_estimate() {
     return bw_measurements_[bw_measurements_.size() - 1];
 }
 
-void ClientData::record_acked_bytes(QuicByteCount x) {
+QuicBandwidth ClientData::get_conservative_rate_estimate() {
+    // Use the stdev of the last 4 measurements.
+    size_t lookback = 4;
+    double latest_rate = get_latest_rate_estimate().ToBitsPerSecond();
+    if (bw_measurements_.size() < lookback) {
+        return QuicBandwidth::FromBitsPerSecond(0.8 * latest_rate);
+    }
+    double avg = 0.0;
+    for (size_t i = 0; i < lookback; i++) {
+        avg += bw_measurements_[bw_measurements_.size() - i - 1].ToBitsPerSecond();
+    }
+    avg /= lookback;
+    double stdev = 0.0;
+    for (size_t i = 0; i < lookback; i++) {
+        double m = bw_measurements_[bw_measurements_.size()  - i - 1].ToBitsPerSecond();
+        stdev += pow(m - avg, 2);
+    }
+    stdev = sqrt(stdev/lookback);
+    double cons_rate = fmax(latest_rate - stdev, latest_rate * 0.5);
+    return QuicBandwidth::FromBitsPerSecond(cons_rate);
+}
+
+bool ClientData::record_acked_bytes(QuicByteCount x) {
     bytes_since_last_measurement_ += x;
-    update_chunk_remainder(x);
+    return update_chunk_remainder(x);
 }
 
 double ClientData::get_buffer_estimate() {
@@ -153,6 +177,10 @@ double ClientData::get_past_qoe() {
 }
 
 double ClientData::utility_for_bitrate(int bitrate) {
+    double q = vid_.vmaf_for_chunk(bitrate);
+    if (q > 0) {
+        return q/5.0;
+    }
     return 20 - 20.0 * exp(-3.0 * bitrate/4300.0 / screen_size_);
 }
 

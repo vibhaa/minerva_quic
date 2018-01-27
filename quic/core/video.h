@@ -23,7 +23,8 @@ class Video {
   void set_vmaf_file(std::string);
   void set_fit_file(std::string);
   void set_screen_size(int);
-  
+
+  double vmaf_for_chunk(int bitrate);  
   double qoe(int chunk_ix, double rate);// rate in Kbps
   double vmaf_qoe(int chunk_ix, double rate);
 

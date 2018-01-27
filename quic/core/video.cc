@@ -80,6 +80,16 @@ double Video::qoe(int __chunk_ix, double rate) { // rate in Kbps
 	return qoe;
 }
 
+// Assumes only one chunk.
+double Video::vmaf_for_chunk(int bitrate) {
+    for (size_t i = 0; i < vmafs_.size(); i++) {
+        if ((int)(bitrates_[i]) == bitrate) {
+            return vmafs_[0][i];
+        }
+    }
+    return 0.0;
+}
+
 double Video::vmaf_qoe(int chunk_ix, double rate) {
 
 	assert(vmafs_.size() > 0);

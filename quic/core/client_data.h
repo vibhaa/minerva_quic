@@ -24,15 +24,17 @@ class QUIC_EXPORT_PRIVATE ClientData {
 
   void new_chunk(int bitrate, QuicByteCount chunk_size);
   void reset_chunk_remainder(QuicByteCount x);
-  void update_chunk_remainder(QuicByteCount x);
+  // Returns true when there's a new rate estimate available.
+  bool update_chunk_remainder(QuicByteCount x);
   QuicByteCount get_chunk_remainder();
   int get_chunk_index();
   QuicBandwidth get_latest_rate_estimate();
+  QuicBandwidth get_conservative_rate_estimate();
   double get_buffer_estimate();
   double get_screen_size();
   void set_bw_measurement_interval(QuicTime::Delta interval);
   // Returns true if a new bandwidth estimate is available.
-  void record_acked_bytes(QuicByteCount x);
+  bool record_acked_bytes(QuicByteCount x);
   void set_buffer_estimate(double current_buffer);
   void set_screen_size(double ss);
   void set_trace_file(std::string);

@@ -117,7 +117,7 @@ void ValueFuncAware::ExitSlowstart() {
 
 void ValueFuncAware::UpdateWithAck(QuicByteCount acked_bytes) {
     if (client_data_ != nullptr) {
-        client_data_->record_acked_bytes(acked_bytes);
+        new_rate_update_ = new_rate_update_ || client_data_->record_acked_bytes(acked_bytes);
     }
 }
 
@@ -186,13 +186,20 @@ QuicByteCount ValueFuncAware::GetSlowStartThreshold() const {
 }
 
 void ValueFuncAware::UpdateCwndMultiplier() {
-    DLOG(INFO) << "Updating congestion window";
+    DLOG(INFO) << "Updating congestion window " << congestion_window_;
     if (client_data_ == nullptr) {
         return;
     }
+    if (!new_rate_update_) {
+        return;
+    }
+    new_rate_update_ = false;
     QuicByteCount cs = client_data_->get_chunk_remainder();
     double buf = client_data_->get_buffer_estimate();
-    QuicBandwidth rate = client_data_->get_latest_rate_estimate();
+    QuicBandwidth real_rate = client_data_->get_latest_rate_estimate();
+    QuicBandwidth rate = client_data_->get_conservative_rate_estimate();
+    DLOG(INFO) << "Conservative rate estimate " << rate << ", real rate " << real_rate << ", ratio = "
+        << ((double)rate.ToBitsPerSecond()) / real_rate.ToBitsPerSecond();
     double rebuf_time = 100.0;
     if (rate.ToBytesPerSecond() > 0) { 
         buf -= ((double)cs)/rate.ToBytesPerSecond();
@@ -216,8 +223,17 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     double value = client_data_->get_value_func()->ValueFor(
             buf, ((double)rate.ToBitsPerSecond())/(1000.0 * 1000.0),
             client_data_->current_bitrate());
-    double avg_est_qoe = (client_data_->get_past_qoe() + cur_qoe + value) /
-            (client_data_->get_chunk_index() + 1 + client_data_->get_value_func()->Horizon());
+    double past_qoe_weight = client_data_->get_chunk_index();
+    double cur_chunk_weight = 1.0;
+    double value_weight = 5.0;
+    double avg_est_qoe = cur_qoe * cur_chunk_weight;
+    avg_est_qoe += value * value_weight / client_data_->get_value_func()->Horizon();
+    if (client_data_->get_chunk_index() > 0) {
+        avg_est_qoe += (client_data_->get_past_qoe()) * past_qoe_weight/(client_data_->get_chunk_index());
+    }
+    avg_est_qoe /= (past_qoe_weight + 1 + value_weight);
+    //double avg_est_qoe = (client_data_->get_past_qoe() + cur_qoe + value) /
+    //    (client_data_->get_chunk_index() + 1 + client_data_->get_value_func()->Horizon());
     DLOG(INFO) << "Past qoe = " << client_data_->get_past_qoe()
         << ", cur chunk qoe = " << cur_qoe
         << ", value = " << value
@@ -236,14 +252,16 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     DLOG(INFO) << "Adjusted avg qoe w/ sigmoid = " << adjusted_avg_qoe
         << ", target (packets) = " << target;
     
-    QuicWallTime now = clock_->WallNow();
+    /*QuicWallTime now = clock_->WallNow();
     QuicTime::Delta time_elapsed = now.AbsoluteDifference(last_weight_update_time_);
     last_weight_update_time_ = now;
     double gamma = exp(-time_elapsed.ToMicroseconds()/((double)weight_update_horizon_.ToMicroseconds()));
-    multiplier_ = (1 - gamma) * target + gamma * multiplier_;
-    // We can't exceed a multiplier of 5.
-    multiplier_ = fmin(multiplier_, 5.0);
     DLOG(INFO) << "Updated weight after " << time_elapsed << " and ewma weight " << gamma;
+    multiplier_ = (1 - gamma) * target + gamma * multiplier_;*/
+    // SET FOR IMMEDIATE WEIGHT.
+    multiplier_ = target;
+    // We can't exceed a multiplier of 5.
+    multiplier_ = fmax(fmin(multiplier_, 5.0), 0.5);
     SetWeight(multiplier_);
 
 }

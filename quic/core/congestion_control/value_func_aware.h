@@ -123,6 +123,7 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
 
   QuicWallTime start_time_;
 
+  bool new_rate_update_;
   // kind of transport used - transFast/transReno/transCubic corresponding to
   // whether its running on fastTCP, Reno or Cubic
   TransportType transport_;
