@@ -223,9 +223,9 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     double value = client_data_->get_value_func()->ValueFor(
             buf, ((double)rate.ToBitsPerSecond())/(1000.0 * 1000.0),
             client_data_->current_bitrate());
-    double past_qoe_weight = client_data_->get_chunk_index();
+    double past_qoe_weight = fmin(10, client_data_->get_chunk_index());
     double cur_chunk_weight = 1.0;
-    double value_weight = 5.0;
+    double value_weight = client_data_->get_value_func()->Horizon();
     double avg_est_qoe = cur_qoe * cur_chunk_weight;
     avg_est_qoe += value * value_weight / client_data_->get_value_func()->Horizon();
     if (client_data_->get_chunk_index() > 0) {
@@ -243,11 +243,11 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     // are more or less linear. Scale so that the adjusted values are in [0, 10].
     double adjusted_avg_qoe = 10.0/(1 + exp((10.0-avg_est_qoe)/4.0));
     double target;
-    if (client_data_->get_chunk_index() >= 1) {
+    if (client_data_->get_chunk_index() >= 0) {
         // The target now lies in [30/11, 30/1] = [2.7, 30].
         target = 10.0 * rate.ToKBitsPerSecond()/(1000.0 * (adjusted_avg_qoe));
     } else {
-        target = client_data_->get_screen_size();
+        target = 7.0/client_data_->utility_for_bitrate(client_data_->cur_bitrate());
     }
     DLOG(INFO) << "Adjusted avg qoe w/ sigmoid = " << adjusted_avg_qoe
         << ", target (packets) = " << target;
