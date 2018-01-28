@@ -1,4 +1,4 @@
-// Copyright (c) 2012 The Chromium Authors. All rights reserved.
+
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -100,8 +100,9 @@ void TcpCubicSenderBase::AdjustNetworkParameters(QuicBandwidth bandwidth,
 }
 
 void TcpCubicSenderBase::SetNumEmulatedConnections(int num_connections) {
-  num_connections_ = std::max(1, num_connections);
-  weight_ = num_connections_;
+  //num_connections_ = std::max(1, num_connections);
+ //DLOG(INFO) << "SEtting number of emulated connections to " << num_connections;
+  //weight_ = num_connections_;
 }
 
 void TcpCubicSenderBase::SetWeight(float weight) {

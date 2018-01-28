@@ -115,9 +115,9 @@ void VmafAware::SetMinCongestionWindowInPackets(
 }
 
 void VmafAware::SetNumEmulatedConnections(int num_connections) {
-  TcpCubicSenderBase::SetNumEmulatedConnections(num_connections);
-  cubic_.SetNumConnections(num_connections_);
-  SetWeight(num_connections_);
+  //TcpCubicSenderBase::SetNumEmulatedConnections(num_connections);
+  //cubic_.SetNumConnections(num_connections_);
+  //SetWeight(num_connections_);
 }
 
 void VmafAware::SetWeight(float weight) {

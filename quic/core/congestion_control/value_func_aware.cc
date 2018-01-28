@@ -107,8 +107,8 @@ void ValueFuncAware::SetMinCongestionWindowInPackets(
 }
 
 void ValueFuncAware::SetNumEmulatedConnections(int num_connections) {
-  TcpCubicSenderBase::SetNumEmulatedConnections(num_connections);
-  cubic_.SetNumConnections(num_connections_);
+  //TcpCubicSenderBase::SetNumEmulatedConnections(num_connections);
+  //cubic_.SetNumConnections(num_connections_);
 }
 
 void ValueFuncAware::ExitSlowstart() {

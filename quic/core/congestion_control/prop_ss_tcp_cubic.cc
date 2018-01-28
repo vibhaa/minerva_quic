@@ -216,6 +216,7 @@ void PropSSTcpCubic::MaybeIncreaseCwnd(
             cur_buffer_estimate_ = client_data_->get_buffer_estimate();
         }
         if (ss > 0) {
+            DLOG(INFO) << "In Prop SS setting num connections";
             SetNumEmulatedConnections(ss);
         }
     }

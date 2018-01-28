@@ -97,8 +97,12 @@ void TcpCubicSenderBytes::SetMinCongestionWindowInPackets(
 }
 
 void TcpCubicSenderBytes::SetNumEmulatedConnections(int num_connections) {
-  TcpCubicSenderBase::SetNumEmulatedConnections(num_connections);
-  cubic_.SetNumConnections(num_connections_);
+  if (client_data_ != nullptr) {
+    DLOG(INFO) << "Setting number emulated connections to " << num_connections 
+        << "for screen size " << client_data_->get_screen_size();
+  }
+  //TcpCubicSenderBase::SetNumEmulatedConnections(num_connections);
+  //cubic_.SetNumConnections(num_connections_);
 }
 
 void TcpCubicSenderBytes::ExitSlowstart() {
