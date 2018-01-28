@@ -247,7 +247,7 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         // The target now lies in [30/11, 30/1] = [2.7, 30].
         target = 10.0 * rate.ToKBitsPerSecond()/(1000.0 * (adjusted_avg_qoe));
     } else {
-        target = 7.0/client_data_->utility_for_bitrate(client_data_->cur_bitrate());
+        target = 8.0/client_data_->utility_for_bitrate(client_data_->current_bitrate());
     }
     DLOG(INFO) << "Adjusted avg qoe w/ sigmoid = " << adjusted_avg_qoe
         << ", target (packets) = " << target;
