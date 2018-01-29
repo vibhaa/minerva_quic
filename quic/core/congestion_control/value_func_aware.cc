@@ -234,7 +234,7 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     double value = client_data_->get_value_func()->ValueFor(
             buf, ((double)rate.ToBitsPerSecond())/(1000.0 * 1000.0),
             client_data_->current_bitrate());
-    double past_qoe_weight = fmin(10, client_data_->get_chunk_index());
+    double past_qoe_weight = client_data_->get_chunk_index();
     double cur_chunk_weight = 1.0;
     double value_weight = client_data_->get_value_func()->Horizon();
     double avg_est_qoe = cur_qoe * cur_chunk_weight;
@@ -261,6 +261,7 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         target = 8.0/client_data_->utility_for_bitrate(client_data_->current_bitrate());
     }
     DLOG(INFO) << "Adjusted avg qoe w/ sigmoid = " << adjusted_avg_qoe
+        << ", rate = " << rate.ToKBitsPerSecond()
         << ", target (packets) = " << target;
     
     /*QuicWallTime now = clock_->WallNow();
