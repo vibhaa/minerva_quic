@@ -316,8 +316,8 @@ double VmafAware::CwndMultiplier() {
                 << ", vmaf weight is " << vmaf_weight;
 
     
-    weight = fmax(weight, 0.5);
-    weight = fmin(weight, 5);
+    // weight = fmax(weight, 0.5);
+    // weight = fmin(weight, 5);
 
     if (client_data_->get_chunk_index() < 1) weight = 1.0;
 
