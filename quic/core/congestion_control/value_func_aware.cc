@@ -49,7 +49,7 @@ ValueFuncAware::ValueFuncAware(
       last_time_(QuicWallTime::Zero()),
       multiplier_(1.0),
       last_weight_update_time_(clock->WallNow()),
-      rate_measurement_interval_(QuicTime::Delta::FromMilliseconds(1000)),
+      rate_measurement_interval_(QuicTime::Delta::FromMilliseconds(250)),
       weight_update_horizon_(QuicTime::Delta::FromMilliseconds(1000)),
       start_time_(clock->WallNow()),
       transport_(transport),
@@ -260,7 +260,7 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         // The target now lies in [30/11, 30/1] = [2.7, 30].
         target = 10.0 * rate.ToKBitsPerSecond()/(1000.0 * (adjusted_avg_qoe));
     } else {
-        target = 8.0/client_data_->utility_for_bitrate(client_data_->current_bitrate());
+        target = fmax(10, 8.0/client_data_->utility_for_bitrate(client_data_->current_bitrate()));
     }
     DLOG(INFO) << "Adjusted avg qoe w/ sigmoid = " << adjusted_avg_qoe
         << ", rate = " << rate.ToKBitsPerSecond()
@@ -274,15 +274,20 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     multiplier_ = (1 - gamma) * target + gamma * multiplier_;*/
     // SET FOR IMMEDIATE WEIGHT.
     multiplier_ = target;
+    multiplier_ = fmax(fmin(multiplier_, 20.0), 0.3);
+    DLOG(INFO) << "Got multiplier " << multiplier_;
     
     // UNCOMMENT BELOW TO SET MAX WEIGHT.
     //multiplier_ = fmax(fmin(multiplier_, max_weight_), 1);
     SetWeight(multiplier_);
+    if (transport_ == transFast) {
+        UpdateCwndFastTCP();
+    }
 
 }
 
 void ValueFuncAware::UpdateCwndFastTCP() {
-    double target = 2.5 * weight_;
+    double target = 5.0 * weight_;
     double gamma = 0.8;
     double minrtt = rtt_stats_->min_rtt().ToMilliseconds();
     double new_wnd = (minrtt / rtt_stats_->latest_rtt().ToMilliseconds()) * congestion_window_ +
@@ -356,13 +361,14 @@ void ValueFuncAware::MaybeIncreaseCwnd(
    ++num_acked_packets_;
   // Congestion avoidance.
   if (transport_ == transFast) {
-     // Update cwnd once every RTT, like for reno
+      return;
+     /*// Update cwnd once every RTT, like for reno
      // TODO(vikram): what if we do this on every ack? Too much?
      if (num_acked_packets_ * num_connections_ >=
           congestion_window_ / kDefaultTCPMSS) {
         UpdateCwndFastTCP();
         num_acked_packets_ = 0;
-     }
+     }*/
   } else if (transport_ == transReno) {
     // Classic Reno congestion avoidance.
     // Divide by num_connections to smoothly increase the CWND at a faster rate
