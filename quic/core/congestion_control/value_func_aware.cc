@@ -53,7 +53,9 @@ ValueFuncAware::ValueFuncAware(
       weight_update_horizon_(QuicTime::Delta::FromMilliseconds(1000)),
       start_time_(clock->WallNow()),
       transport_(transport),
-      bw_log_file_() {
+      bw_log_file_(),
+      max_weight_(5.0) {
+        ReadArgs();
       }
 
 ValueFuncAware::~ValueFuncAware() {
@@ -113,6 +115,15 @@ void ValueFuncAware::SetNumEmulatedConnections(int num_connections) {
 
 void ValueFuncAware::ExitSlowstart() {
   slowstart_threshold_ = congestion_window_;
+}
+
+void ValueFuncAware::ReadArgs() {
+  std::ifstream f("/tmp/quic-max-val.txt");
+  std::string t;
+  while(f >> t) {
+    max_weight_ = std::stod(t);
+    print max_weight_;
+  }
 }
 
 void ValueFuncAware::UpdateWithAck(QuicByteCount acked_bytes) {
@@ -261,7 +272,7 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     // SET FOR IMMEDIATE WEIGHT.
     multiplier_ = target;
     // We can't exceed a multiplier of 5.
-    multiplier_ = fmax(fmin(multiplier_, 5.0), 0.5);
+    multiplier_ = fmax(fmin(multiplier_, max_weight_), 1);
     SetWeight(multiplier_);
 
 }

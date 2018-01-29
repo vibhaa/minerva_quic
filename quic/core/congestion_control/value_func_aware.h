@@ -38,6 +38,8 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
                       TransportType transport);
   ~ValueFuncAware() override;
 
+  void ReadArgs();
+
   void SetAuxiliaryClientData(ClientData* client_data) override;
 
   // Start implementation of SendAlgorithmInterface.
@@ -131,6 +133,9 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
   // Handle of the log file we write to, so we don't reopen the file
   // on every ack that we get.
   std::ofstream bw_log_file_;
+
+  // maximum weight to use (Weight's capped at this)
+  double max_weight_;
 
   DISALLOW_COPY_AND_ASSIGN(ValueFuncAware);
 };
