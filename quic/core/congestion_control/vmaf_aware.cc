@@ -56,14 +56,19 @@ VmafAware::VmafAware(
       client_data_(nullptr),
       last_time_(QuicWallTime::Zero()),
       last_weight_update_time_(QuicWallTime::Zero()),
+      rate_measurement_interval_(QuicTime::Delta::FromMilliseconds(1000)),
       past_weight_(-1.0),
       cur_buffer_estimate_(-1.0),
       bandwidth_ests_(100, QuicBandwidth::Zero()),
       bandwidth_ix_(0), 
       log_multiplier(-1), 
       log_prev_rate(-1),
+      max_weight_(5.0),
       bw_log_file_(){
         ReadArgs();
+        if (transport_ == transFast) {
+          rate_measurement_interval_ = QuicTime::Delta::FromMilliseconds(250);
+        }
       }
 
 VmafAware::~VmafAware() {}
@@ -234,6 +239,18 @@ void VmafAware::ReadArgs() {
   while(f >> t) {
     read_options.push_back(t);
   }
+
+  std::ifstream f2("/tmp/quic-max-val.txt");
+  max_weight_ = -1.0;
+  if (!f2.good()) {
+      return;
+  }
+  while(f2 >> t) {
+    double weight = std::stod(t);
+    if (weight > 0) {
+        max_weight_ = 5.0;
+    }
+  }
 }
 
 bool VmafAware::isOption(std::string s) {
@@ -282,8 +299,6 @@ double VmafAware::FitConstantWeight(double prev_rate) {
 //     return vmaf_weight;
 // }
 
-const double MILLI_SECONDS_LAG = 2000.0;
-
 double VmafAware::CwndMultiplier() {
 
     QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_weight_update_time_);
@@ -315,9 +330,11 @@ double VmafAware::CwndMultiplier() {
     DLOG(INFO) << " screen size = " << client_data_ -> get_screen_size() 
                 << ", vmaf weight is " << vmaf_weight;
 
-    
-    // weight = fmax(weight, 0.5);
-    // weight = fmin(weight, 5);
+    if (max_weight_ > 0) {
+        weight = fmax(fmin(weight, 5.0), 1.0);
+    } else {
+        weight = fmax(fmin(weight, 20.0), 0.5);
+    }
 
     if (client_data_->get_chunk_index() < 1) weight = 1.0;
 
@@ -328,7 +345,7 @@ double VmafAware::CwndMultiplier() {
     DLOG(INFO) << "rtt is in ms " << rtt_stats_->latest_rtt().ToMilliseconds() << " last window is "
                                                                  << congestion_window_;
 
-    if ( past_weight_ < 0 || time_elapsed >= QuicTime::Delta::FromMilliseconds(MILLI_SECONDS_LAG)) {
+    if ( past_weight_ < 0 || time_elapsed >= rate_measurement_interval_){
         past_weight_ = weight;
         last_weight_update_time_ = clock_->WallNow();
         log_multiplier = weight;
@@ -364,6 +381,7 @@ void VmafAware::MaybeIncreaseCwnd(
         if (!bw_log_file_.is_open()) {
             std::string filename = "quic_bw_vmaf_" + std::to_string(client_data_->get_client_id()) + ".log";
             bw_log_file_.open(filename, std::ios::trunc);
+            client_data_->set_bw_measurement_interval(rate_measurement_interval_);
         }
         double ss = client_data_->get_screen_size();
 

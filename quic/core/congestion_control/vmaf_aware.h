@@ -130,7 +130,8 @@ class QUIC_EXPORT_PRIVATE VmafAware : public TcpCubicSenderBase {
 
   // last time when weight was updated
   QuicWallTime last_weight_update_time_;
-
+  
+  QuicTime::Delta rate_measurement_interval_;
   // last weight used for decentralized max prop and risk
   double past_weight_;
 
@@ -147,6 +148,8 @@ class QUIC_EXPORT_PRIVATE VmafAware : public TcpCubicSenderBase {
   double log_multiplier;
 
   double log_prev_rate;
+
+  double max_weight_;
 
   std::vector<std::string> read_options;
   
