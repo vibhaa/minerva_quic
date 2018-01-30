@@ -49,13 +49,16 @@ ValueFuncAware::ValueFuncAware(
       last_time_(QuicWallTime::Zero()),
       multiplier_(1.0),
       last_weight_update_time_(clock->WallNow()),
-      rate_measurement_interval_(QuicTime::Delta::FromMilliseconds(250)),
+      rate_measurement_interval_(QuicTime::Delta::FromMilliseconds(1000)),
       weight_update_horizon_(QuicTime::Delta::FromMilliseconds(1000)),
       start_time_(clock->WallNow()),
       transport_(transport),
       bw_log_file_(),
       max_weight_(5.0) {
-        ReadArgs();
+          ReadArgs();
+          if (transport_ == transFast) {
+              rate_measurement_interval_ = QuicTime::Delta::FromMilliseconds(250);
+          }
       }
 
 ValueFuncAware::~ValueFuncAware() {
@@ -198,6 +201,51 @@ QuicByteCount ValueFuncAware::GetSlowStartThreshold() const {
   return slowstart_threshold_;
 }
 
+double ValueFuncAware::AverageExpectedQoe(QuicBandwidth rate) {
+    QuicByteCount cs = client_data_->get_chunk_remainder();
+    double buf = client_data_->get_buffer_estimate();
+    double rebuf_time = 100.0;
+    if (rate.ToBytesPerSecond() > 0) { 
+        buf -= ((double)cs)/rate.ToBytesPerSecond();
+        if (buf < 0) {
+            rebuf_time = -buf;
+            buf = 0.0;
+        } else {
+            rebuf_time = 0.0;
+        }
+    }
+    DLOG(INFO) << "Chunk remainder (bytes) = " << cs
+        << ", buffer = " << buf
+        << ", ss = " << client_data_->get_screen_size()
+        << ", chunk_ix = " << client_data_->get_chunk_index()
+        << ", rate estimate = " << rate.ToKBitsPerSecond();
+    DLOG(INFO) << "current bitrate " << client_data_->current_bitrate()
+        << ", prev bitrate " << client_data_->prev_bitrate();
+    double cur_qoe = client_data_->qoe(client_data_->current_bitrate(), rebuf_time,
+        client_data_->prev_bitrate());
+    buf += 4.0;
+    double value = client_data_->get_value_func()->ValueFor(
+            buf, ((double)rate.ToBitsPerSecond())/(1000.0 * 1000.0),
+            client_data_->current_bitrate());
+    double past_qoe_weight = client_data_->get_chunk_index();
+    double cur_chunk_weight = 1.0;
+    double value_weight = client_data_->get_value_func()->Horizon();
+    double avg_est_qoe = cur_qoe * cur_chunk_weight;
+    avg_est_qoe += value * value_weight / client_data_->get_value_func()->Horizon();
+    if (client_data_->get_chunk_index() > 0) {
+        avg_est_qoe += (client_data_->get_past_qoe()) * past_qoe_weight/(client_data_->get_chunk_index());
+    }
+    avg_est_qoe /= (past_qoe_weight + 1 + value_weight);
+    //double avg_est_qoe = (client_data_->get_past_qoe() + cur_qoe + value) /
+    //    (client_data_->get_chunk_index() + 1 + client_data_->get_value_func()->Horizon());
+    DLOG(INFO) << "Past qoe = " << client_data_->get_past_qoe()
+        << ", cur chunk qoe = " << cur_qoe
+        << ", value = " << value
+        << ", ss = " << client_data_->get_screen_size()
+        << ", avg est qoe = " << avg_est_qoe; 
+    return avg_est_qoe;
+}
+
 void ValueFuncAware::UpdateCwndMultiplier() {
     DLOG(INFO) << "Updating congestion window " << congestion_window_;
     if (client_data_ == nullptr) {
@@ -207,7 +255,7 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         return;
     }
     new_rate_update_ = false;
-    QuicByteCount cs = client_data_->get_chunk_remainder();
+    /*QuicByteCount cs = client_data_->get_chunk_remainder();
     double buf = client_data_->get_buffer_estimate();
     QuicBandwidth real_rate = client_data_->get_latest_rate_estimate();
     QuicBandwidth rate = client_data_->get_conservative_rate_estimate();
@@ -253,16 +301,37 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         << ", ss = " << client_data_->get_screen_size()
         << ", avg est qoe = " << avg_est_qoe; 
     // QOEs are within [-5, 20] so use a sigmoid centered at 8 such that values in this range
-    // are more or less linear. Scale so that the adjusted values are in [0, 10].
-    double adjusted_avg_qoe = 10.0/(1 + exp((10.0-avg_est_qoe)/4.0));
+    // are more or less linear. Scale so that the adjusted values are in [0, 10].*/
+    QuicBandwidth real_rate = client_data_->get_latest_rate_estimate();
+    QuicBandwidth rate = client_data_->get_conservative_rate_estimate();
+    DLOG(INFO) << "Conservative rate estimate " << rate << ", real rate " << real_rate << ", ratio = "
+        << ((double)rate.ToBitsPerSecond()) / real_rate.ToBitsPerSecond();
+    double utility;
+    bool prop_fairness = false; // EXPERIMENTAL!
+    if (!prop_fairness) {
+        utility = AverageExpectedQoe(rate);
+    }
+    else {
+        QuicBandwidth rate_md = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() - 100000);
+        QuicBandwidth rate_pd = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() + 100000);
+        double d_utility = (AverageExpectedQoe(rate_pd) - AverageExpectedQoe(rate_md)) / 0.2;
+        utility = 4* AverageExpectedQoe(rate)/d_utility;
+    }
+
+    // Compute Proportional fairness
+    double adjusted_utility = 10.0/(1 + exp((10.0-utility)/4.0));
     double target;
+    if (adjusted_utility == 0) {
+        adjusted_utility = 0.1;
+    }
     if (client_data_->get_chunk_index() >= 0) {
         // The target now lies in [30/11, 30/1] = [2.7, 30].
-        target = 10.0 * rate.ToKBitsPerSecond()/(1000.0 * (adjusted_avg_qoe));
+        target = 10.0 * rate.ToKBitsPerSecond()/(1000.0 * (adjusted_utility));
     } else {
         target = fmax(10, 8.0/client_data_->utility_for_bitrate(client_data_->current_bitrate()));
     }
-    DLOG(INFO) << "Adjusted avg qoe w/ sigmoid = " << adjusted_avg_qoe
+    DLOG(INFO) << "Utility = " << utility
+        << ", adjusted avg utility w/ sigmoid = " << adjusted_utility
         << ", rate = " << rate.ToKBitsPerSecond()
         << ", target (packets) = " << target;
     
@@ -274,7 +343,7 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     multiplier_ = (1 - gamma) * target + gamma * multiplier_;*/
     // SET FOR IMMEDIATE WEIGHT.
     multiplier_ = target;
-    multiplier_ = fmax(fmin(multiplier_, 20.0), 0.3);
+    multiplier_ = fmax(fmin(multiplier_, 20.0), 0.5);
     DLOG(INFO) << "Got multiplier " << multiplier_;
     
     // UNCOMMENT BELOW TO SET MAX WEIGHT.

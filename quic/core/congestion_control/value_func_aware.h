@@ -51,6 +51,7 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
   QuicByteCount GetSlowStartThreshold() const override;
   CongestionControlType GetCongestionControlType() const override;
   // End implementation of SendAlgorithmInterface.
+  double AverageExpectedQoe(QuicBandwidth rate);
   void UpdateCwndMultiplier();
   void UpdateCwndFastTCP();
   void SetWeight(float weight);
