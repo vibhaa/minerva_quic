@@ -122,12 +122,16 @@ void ValueFuncAware::ExitSlowstart() {
 
 void ValueFuncAware::ReadArgs() {
   std::ifstream f("/tmp/quic-max-val.txt");
+  max_weight_ = -1.0;
   if (!f.good()) {
       return;
   }
   std::string t;
   while(f >> t) {
-    max_weight_ = std::stod(t);
+    double weight = std::stod(t);
+    if (weight > 0) {
+        max_weight_ = 5.0;
+    }
   }
 }
 
@@ -343,7 +347,11 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     multiplier_ = (1 - gamma) * target + gamma * multiplier_;*/
     // SET FOR IMMEDIATE WEIGHT.
     multiplier_ = target;
-    multiplier_ = fmax(fmin(multiplier_, 20.0), 0.5);
+    if (max_weight_ > 0) {
+        multiplier_ = fmax(fmin(multiplier_, 5.0), 1.0);
+    } else {
+        multiplier_ = fmax(fmin(multiplier_, 20.0), 0.5);
+    }
     DLOG(INFO) << "Got multiplier " << multiplier_;
     
     // UNCOMMENT BELOW TO SET MAX WEIGHT.
