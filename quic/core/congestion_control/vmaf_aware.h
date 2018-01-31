@@ -86,6 +86,7 @@ class QUIC_EXPORT_PRIVATE VmafAware : public TcpCubicSenderBase {
   double FitConstantWeight(double prev_rate);
   double FitBasedWeight(double prev_rate);
   bool isOption(std::string s);
+  double ReadMaxWeight();
 
   // This is the fast TCP update rule.
   void UpdateCongestionWindow();

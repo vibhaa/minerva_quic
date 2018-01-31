@@ -22,6 +22,7 @@
 #define PERCEPTUAL_QOE "perceptual_qoe"
 #define FIT_SS "fit_ss"
 #define USE_RISK "use_risk"
+#define MAX_WEIGHT "max_weight"
 
 namespace net {
 
@@ -248,11 +249,25 @@ void VmafAware::ReadArgs() {
   while(f2 >> t) {
     double weight = std::stod(t);
     if (weight > 0) {
-        max_weight_ = 5.0;
+        max_weight_ = weight;
     }
   }
 }
 
+double VmafAware::ReadMaxWeight() {
+  std::string t;
+  if (client_data_ -> get_screen_size() > 1) {
+    std::ifstream f2("/tmp/quic-max-val.txt");
+    while(f2 >> t) {
+      double weight = std::stod(t);
+      if (weight > 0) {
+          max_weight_ = weight;
+          return max_weight_;
+      }
+    }
+  }
+  return 1.0;
+}
 bool VmafAware::isOption(std::string s) {
   for(unsigned int i = 0; i < read_options.size(); ++i) {
     if (read_options[i] == s) {
@@ -317,6 +332,8 @@ double VmafAware::CwndMultiplier() {
        vmaf_weight = QoeBasedWeight(prev_rate);
     else if (isOption(FIT_SS))
         vmaf_weight = FitConstantWeight(prev_rate);
+    else if (isOption(MAX_WEIGHT))
+        return ReadMaxWeight();
     else{
         DLOG(INFO) << "Incorrect case specified";
         assert(false);
