@@ -76,6 +76,9 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
 
   void UpdateWithAck(QuicByteCount acked_bytes) override;
 
+  bool isOption(std::string s);
+  double ReadMaxWeight();
+
  private:
   friend class test::ValueFuncAwarePeer;
 
@@ -138,7 +141,10 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
   // maximum weight to use (Weight's capped at this)
   double max_weight_;
 
+  std::vector<std::string> read_options;
+
   DISALLOW_COPY_AND_ASSIGN(ValueFuncAware);
+
 };
 
 }  // namespace net

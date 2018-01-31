@@ -17,6 +17,8 @@
 #include "net/quic/platform/api/quic_flags.h"
 #include "net/quic/platform/api/quic_logging.h"
 
+#define MAX_WEIGHT "max_weight"
+
 namespace net {
 
 namespace {
@@ -120,6 +122,14 @@ void ValueFuncAware::ExitSlowstart() {
   slowstart_threshold_ = congestion_window_;
 }
 
+bool ValueFuncAware::isOption(std::string s) {
+  for(unsigned int i = 0; i < read_options.size(); ++i) {
+    if (read_options[i] == s) {
+      return true;
+    }
+  }
+  return false;
+}
 void ValueFuncAware::ReadArgs() {
   std::ifstream f("/tmp/quic-max-val.txt");
   max_weight_ = -1.0;
@@ -133,6 +143,25 @@ void ValueFuncAware::ReadArgs() {
         max_weight_ = 5.0;
     }
   }
+  std::ifstream f2("/tmp/quic-args.txt");
+  if (!f2.good())return;
+  while(f2 >> t) {
+    read_options.push_back(t);
+  }
+}
+
+double ValueFuncAware::ReadMaxWeight() {
+  std::string t;
+  if (client_data_ -> get_screen_size() > 1) {
+    std::ifstream f2("/tmp/quic-max-val.txt");
+    while(f2 >> t) {
+      double weight = std::stod(t);
+      if (weight > 0) {
+          return weight;
+      }
+    }
+  }
+  return 1.0;
 }
 
 void ValueFuncAware::UpdateWithAck(QuicByteCount acked_bytes) {
@@ -351,6 +380,9 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         multiplier_ = fmax(fmin(multiplier_, 5.0), 1.0);
     } else {
         multiplier_ = fmax(fmin(multiplier_, 20.0), 0.5);
+    }
+    if (isOption(MAX_WEIGHT)){
+      multiplier_ = ReadMaxWeight();
     }
     DLOG(INFO) << "Got multiplier " << multiplier_;
     

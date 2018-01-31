@@ -243,9 +243,6 @@ void VmafAware::ReadArgs() {
 
   std::ifstream f2("/tmp/quic-max-val.txt");
   max_weight_ = -1.0;
-  if (!f2.good()) {
-      return;
-  }
   while(f2 >> t) {
     double weight = std::stod(t);
     if (weight > 0) {
