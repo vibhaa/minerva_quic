@@ -20,6 +20,7 @@ ClientData::ClientData(const QuicClock* clock)
       chunk_remainder_(0),
       rebuf_penalty_(5.0),
       smooth_penalty_(1.0),
+      start_time_(clock->WallNow()),
       last_measurement_start_time_(clock->WallNow()),
       bytes_since_last_measurement_(0),
       last_record_time_(QuicWallTime::Zero()),

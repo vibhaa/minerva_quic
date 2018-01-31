@@ -82,6 +82,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   double rebuf_penalty_;
   double smooth_penalty_;
 
+  QuicWallTime start_time_;
   QuicWallTime last_measurement_start_time_;
   QuicByteCount bytes_since_last_measurement_;
   QuicWallTime last_record_time_;
