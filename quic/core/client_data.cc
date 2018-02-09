@@ -131,7 +131,6 @@ Video* ClientData::get_video(){
 }
 
 std::string ClientData::get_vid_prefix() {
-  assert(vid_prefix_.length() > 0);
   return vid_prefix_;
 }
 

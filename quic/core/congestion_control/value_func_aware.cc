@@ -296,19 +296,24 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     DLOG(INFO) << "Conservative rate estimate " << rate << ", real rate " << real_rate << ", ratio = "
         << ((double)rate.ToBitsPerSecond()) / real_rate.ToBitsPerSecond();
     double utility;
+    double adjusted_utility;
     bool prop_fairness = false; // EXPERIMENTAL!
+    
     if (!prop_fairness) {
         utility = AverageExpectedQoe(rate);
+        adjusted_utility = 10.0/(1 + exp((10.0-utility)/4.0));
     }
     else {
         QuicBandwidth rate_md = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() - 100000);
         QuicBandwidth rate_pd = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() + 100000);
-        double d_utility = (AverageExpectedQoe(rate_pd) - AverageExpectedQoe(rate_md)) / 0.2;
-        utility = 4* AverageExpectedQoe(rate)/d_utility;
+        double q_pd = AverageExpectedQoe(rate_pd);
+        double q_md = AverageExpectedQoe(rate_md);
+        double d_utility = (q_pd - q_md)/0.2;
+        DLOG(INFO) << "Derivative is (" << q_pd << " - " << q_md << ")/0.2 = " << d_utility; 
+        utility = 2* AverageExpectedQoe(rate)/d_utility;
+        adjusted_utility = 10.0/(1 + exp((10.0-utility)/8.0));
     }
 
-    // Compute Proportional fairness
-    double adjusted_utility = 10.0/(1 + exp((10.0-utility)/4.0));
     double target;
     if (adjusted_utility == 0) {
         adjusted_utility = 0.1;
@@ -340,6 +345,7 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     if (isOption(MAX_WEIGHT)){
       multiplier_ = ReadMaxWeight();
     }
+
     DLOG(INFO) << "Got multiplier " << multiplier_;
    
     // UNCOMMENT BELOW TO SET MAX WEIGHT.
