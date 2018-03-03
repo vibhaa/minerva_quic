@@ -65,6 +65,7 @@ ValueFuncAware::ValueFuncAware(
 
 ValueFuncAware::~ValueFuncAware() {
     bw_log_file_.close();
+    delete client_data_;
 }
 
 void ValueFuncAware::SetAuxiliaryClientData(ClientData* cdata) {
@@ -283,7 +284,7 @@ double ValueFuncAware::AverageExpectedQoe(QuicBandwidth rate) {
 }
 
 void ValueFuncAware::UpdateCwndMultiplier() {
-    DLOG(INFO) << "Updating congestion window " << congestion_window_;
+    // DLOG(INFO) << "Updating congestion window " << congestion_window_;
     if (client_data_ == nullptr) {
         return;
     }
@@ -301,17 +302,48 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     
     if (!prop_fairness) {
         utility = AverageExpectedQoe(rate);
-        adjusted_utility = 10.0/(1 + exp((10.0-utility)/4.0));
+        if (utility > 30) {
+            adjusted_utility = 30.0;
+        }
+        adjusted_utility = log(1 + exp(utility));
+        //adjusted_utility = 10.0/(1 + exp((10.0-utility)/4.0));
     }
     else {
-        QuicBandwidth rate_md = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() - 100000);
-        QuicBandwidth rate_pd = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() + 100000);
-        double q_pd = AverageExpectedQoe(rate_pd);
-        double q_md = AverageExpectedQoe(rate_md);
-        double d_utility = (q_pd - q_md)/0.2;
-        DLOG(INFO) << "Derivative is (" << q_pd << " - " << q_md << ")/0.2 = " << d_utility; 
-        utility = 2* AverageExpectedQoe(rate)/d_utility;
-        adjusted_utility = 10.0/(1 + exp((10.0-utility)/8.0));
+        QuicBandwidth rate_m1 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() - 100000);
+        //QuicBandwidth rate_m2 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() - 200000);
+        //QuicBandwidth rate_m3 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() - 300000);
+        //QuicBandwidth rate_m4 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() - 400000);
+        //QuicBandwidth rate_m5 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() - 500000);
+        QuicBandwidth rate_p1 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() + 100000);
+        //QuicBandwidth rate_p2 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() + 200000);
+        //QuicBandwidth rate_p3 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() + 300000);
+        //QuicBandwidth rate_p4 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() + 400000);
+        //QuicBandwidth rate_p5 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() + 500000);
+        double q_p1 = AverageExpectedQoe(rate_p1);
+        //double q_p2 = AverageExpectedQoe(rate_p2);
+        //double q_p3 = AverageExpectedQoe(rate_p3);
+        //double q_p4 = AverageExpectedQoe(rate_p4);
+        //double q_p5 = AverageExpectedQoe(rate_p5);
+        double q_m1 = AverageExpectedQoe(rate_m1);
+        //double q_m2 = AverageExpectedQoe(rate_m2);
+        //double q_m3 = AverageExpectedQoe(rate_m3);
+        //double q_m4 = AverageExpectedQoe(rate_m4);
+        //double q_m5 = AverageExpectedQoe(rate_m5);
+        double d_utility1 = (q_p1 - q_m1)/0.2;
+        //double d_utility2 = (q_p2 - q_m2)/0.4;
+        //double d_utility3 = (q_p3 - q_m3)/0.6;
+        //double d_utility4 = (q_p4 - q_m4)/0.8;
+        //double d_utility5 = (q_p5 - q_m5)/1.0;
+        double d_utility = d_utility1; //(d_utility1 + d_utility2 + d_utility3 + d_utility4 + d_utility5) / 4;
+        DLOG(INFO) << "Derivative is " << d_utility; 
+        utility = AverageExpectedQoe(rate)/d_utility;
+        if (utility > 30) {
+            adjusted_utility = 30;
+        } else {
+            // Softmax instead of sigmoid
+            adjusted_utility = log(1 + exp(utility));
+        }
+        //adjusted_utility = 10.0/(1 + exp((10.0-utility)/8.0));
     }
 
     double target;
@@ -358,7 +390,7 @@ void ValueFuncAware::UpdateCwndMultiplier() {
 }
 
 void ValueFuncAware::UpdateCwndFastTCP() {
-    double target = 5.0 * weight_;
+    double target = 5 * weight_;
     double gamma = 0.8;
     double minrtt = rtt_stats_->min_rtt().ToMilliseconds();
     double new_wnd = (minrtt / rtt_stats_->latest_rtt().ToMilliseconds()) * congestion_window_ +

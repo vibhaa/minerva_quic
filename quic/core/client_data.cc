@@ -5,6 +5,9 @@
 
 #include "net/quic/core/client_data.h"
 
+#include "net/quic/core/value_func_raw.h"
+#include "net/quic/core/value_func_fit.h"
+#include "net/quic/core/value_func_interp.h"
 #include "net/quic/platform/api/quic_clock.h"
 #include "net/quic/platform/api/quic_logging.h"
 
@@ -27,10 +30,12 @@ ClientData::ClientData(const QuicClock* clock)
       last_buffer_update_time_(QuicWallTime::Zero()),
       bw_measurement_interval_(QuicTime::Delta::FromMilliseconds(500)),
       bw_measurements_(),
-      value_func_(),
+      value_func_(new ValueFuncRaw()),
       bitrates_() {}
 
-ClientData::~ClientData() {}
+ClientData::~ClientData() {
+    delete value_func_;
+}
 
 void ClientData::new_chunk(int bitrate, QuicByteCount chunk_size) {
     // Hack because the first chunk gives us a bitrate of 0.
@@ -161,11 +166,13 @@ void ClientData::set_trace_file(std::string f) {
 
 void ClientData::load_value_function(const std::string& filename) {
     DLOG(INFO) << "Setting value function from " << filename;
-    value_func_ = ValueFunc(filename);
+    delete value_func_;
+    // Change this to ValueFuncFit for a quadratic fit.
+    value_func_ = new ValueFuncInterp(filename);
 }
 
 ValueFunc* ClientData::get_value_func() {
-    return &value_func_;
+    return value_func_;
 }
 
 void ClientData::set_past_qoe(double qoe) {

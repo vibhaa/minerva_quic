@@ -14,6 +14,8 @@
 #include "net/quic/core/quic_time.h"
 #include "net/quic/core/video.h"
 #include "net/quic/core/value_func.h"
+#include "net/quic/core/value_func_raw.h"
+#include "net/quic/core/value_func_fit.h"
 
 namespace net {
 
@@ -91,7 +93,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   std::vector<QuicBandwidth> bw_measurements_;
   Video vid_;
   std::string trace_file_;
-  ValueFunc value_func_;
+  ValueFunc* value_func_;
   std::vector<int> bitrates_;
   std::string vid_prefix_;
 };

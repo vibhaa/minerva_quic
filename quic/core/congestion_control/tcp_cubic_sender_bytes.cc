@@ -48,7 +48,9 @@ TcpCubicSenderBytes::TcpCubicSenderBytes(
       last_time_(QuicWallTime::Zero()),
       min_slow_start_exit_window_(min_congestion_window_) {}
 
-TcpCubicSenderBytes::~TcpCubicSenderBytes() {}
+TcpCubicSenderBytes::~TcpCubicSenderBytes() {
+    delete client_data_;
+}
 
 void TcpCubicSenderBytes::SetAuxiliaryClientData(ClientData* cdata) {
     client_data_ = cdata;

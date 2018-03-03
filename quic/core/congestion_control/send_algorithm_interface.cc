@@ -11,7 +11,7 @@
 #include "net/quic/core/congestion_control/vmaf_aware.h"
 #include "net/quic/core/congestion_control/prop_ss_fast_tcp.h"
 #include "net/quic/core/congestion_control/value_func_aware.h"
-#include "net/quic/core/congestion_control/num_sender.h"
+//#include "net/quic/core/congestion_control/num_sender.h"
 #include "net/quic/core/client_data.h"
 #include "net/quic/core/quic_packets.h"
 #include "net/quic/platform/api/quic_bug_tracker.h"
@@ -120,10 +120,14 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
               max_congestion_window, stats, transFast);
     case kNUM:
       DLOG(INFO) << "Congestion control type is NUM";
-      return new NumSender(
+      return new ValueFuncAware(
               clock, rtt_stats, initial_congestion_window,
-              max_congestion_window, stats);
-  }
+              max_congestion_window, stats, transFast);
+      //return new NumSender(
+      //        clock, rtt_stats, initial_congestion_window,
+      //        max_congestion_window, stats);
+ 
+              }
   return nullptr;
 }
 

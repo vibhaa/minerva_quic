@@ -20,27 +20,14 @@ namespace net {
 
 class QUIC_EXPORT_PRIVATE ValueFunc {
  public:
-  ValueFunc();
-  ValueFunc(const string& filename);
-  ~ValueFunc();
+  ValueFunc() {};
+  ValueFunc(const string& filename) {};
+  virtual ~ValueFunc() {};
 
   // Expects the buffer in seconds, rate in Mbits/sec.
-  double ValueFor(double buffer, double rate, int prev_bitrate);
-  int Horizon();
-  string ArrToString(vector<double> arr);
-
- private:
-  void ParseFrom(const string& filename);
-  vector<double> ParseArray(ifstream *file);
-
-  bool parsed_;
-  int horizon_;
-  vector<double> buffers_;
-  vector<double> rates_;
-  vector<int> bitrates_;
-  vector<vector<vector<double>>> values_;
-  // Inverse map from bitrate to index in bitrates_;
-  map<int, int> br_inverse_;
+  virtual double ValueFor(double buffer, double rate, int prev_bitrate) = 0;
+  virtual int Horizon() = 0;
+  virtual string ArrToString(vector<double> arr) = 0;
 };
 
 }  // namespace net

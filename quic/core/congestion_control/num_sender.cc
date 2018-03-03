@@ -32,8 +32,9 @@ NumSender::NumSender(
     const RttStats* rtt_stats,
     QuicPacketCount initial_tcp_congestion_window,
     QuicPacketCount max_congestion_window,
-    QuicConnectionStats* stats)
-    : TcpCubicSenderBase(clock, rtt_stats, true, stats), // Only works with "reno"
+    QuicConnectionStats* stats,
+    TransportType transport)
+    : TcpCubicSenderBase(clock, rtt_stats, transport == transReno, stats), // Only works with "reno"
       cubic_(clock),
       num_acked_packets_(0),
       congestion_window_(initial_tcp_congestion_window * kDefaultTCPMSS),
@@ -47,7 +48,13 @@ NumSender::NumSender(
       min_slow_start_exit_window_(min_congestion_window_),
       client_data_(nullptr),
       last_time_(QuicWallTime::Zero()),
-      cur_buffer_estimate_(-1.0),
+      multiplier_(1.0),
+      last_weight_update_time_(clock->WallNow()),
+      rate_measurement_interval_(QuicTime::Delta::FromMilliseconds(1000)),
+      weight_update_horizon_(QuicTime::Delta::FromMilliseconds(1000)),
+      bw_log_file(),
+      transport_(transport),
+      max_weight_(5.0),
       start_time_(clock->WallNow()) {}
 
 NumSender::~NumSender() {}
@@ -186,7 +193,7 @@ void NumSender::UpdateCongestionWindow() {
     double gamma = 0.25;
     DLOG(INFO) << "Updating congestion window";
     if (client_data_ != nullptr) {
-        double a = 20;
+        double a = 20 * 1500;
         double ss = client_data_->get_screen_size();
         double c = 3.0/4300/ss;
         double rtt = rtt_stats_->latest_rtt().ToMilliseconds();

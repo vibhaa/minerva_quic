@@ -1,4 +1,4 @@
-#include "net/quic/core/value_func.h"
+#include "net/quic/core/value_func_raw.h"
 
 #include <stdlib.h>
 #include <iostream>
@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <map>
 #include <vector>
+#include <cassert>
 
 #include "net/quic/platform/api/quic_logging.h"
 
@@ -14,7 +15,7 @@ using namespace std;
 
 namespace net {
 
-ValueFunc::ValueFunc()
+ValueFuncRaw::ValueFuncRaw()
     : parsed_(false),
       horizon_(5),
       buffers_(),
@@ -23,14 +24,17 @@ ValueFunc::ValueFunc()
       values_(),
       br_inverse_() {}
 
-ValueFunc::ValueFunc(const string& filename)
-   : ValueFunc() {
-       ParseFrom(filename);
+ValueFuncRaw::ValueFuncRaw(const string& filename)
+   : ValueFuncRaw() {
+       ParseFrom(filename); 
+   }
+
+ValueFuncRaw::~ValueFuncRaw() {}
+
+double ValueFuncRaw::ValueFor(double buffer, double rate, int prev_bitrate) {
+    if (true) {
+        return 1.0;
     }
-
-ValueFunc::~ValueFunc() {}
-
-double ValueFunc::ValueFor(double buffer, double rate, int prev_bitrate) {
     if (!parsed_ || prev_bitrate == 0) {
         return 0.0;
     }
@@ -41,15 +45,14 @@ double ValueFunc::ValueFor(double buffer, double rate, int prev_bitrate) {
     size_t rate_ix = (size_t)((rate - rates_[0]) / rate_delta_);
     rate_ix = max((size_t)0, min(rate_ix, rates_.size() - 1)); 
     int br_ix = br_inverse_[prev_bitrate];
-
     return values_[rate_ix][buf_ix][br_ix];
 }
 
-int ValueFunc::Horizon() {
+int ValueFuncRaw::Horizon() {
     return horizon_;
 }
 
-vector<double> ValueFunc::ParseArray(ifstream *file) {
+vector<double> ValueFuncRaw::ParseArray(ifstream *file) {
     string line;
     getline(*file, line);
     istringstream iss(line);
@@ -72,7 +75,7 @@ vector<double> ValueFunc::ParseArray(ifstream *file) {
     return arr;
 }
 
-string ValueFunc::ArrToString(vector<double> arr) {
+string ValueFuncRaw::ArrToString(vector<double> arr) {
     string s = "[";
     for (double d : arr) {
         s += " " + to_string(d);
@@ -81,7 +84,7 @@ string ValueFunc::ArrToString(vector<double> arr) {
     return s;
 }
 
-void ValueFunc::ParseFrom(const string& filename) {
+void ValueFuncRaw::ParseFrom(const string& filename) {
     ifstream file(filename);
     if (!file.is_open()) {
         DLOG(ERROR) << "ERROR: Invalid value function file";
@@ -114,10 +117,13 @@ void ValueFunc::ParseFrom(const string& filename) {
             iss.clear();
             float val;
             for (size_t k = 0; k < bitrates_.size(); k++) {
+                assert(iss.good());
                 iss >> val;
                 values_[i][j][k] = val;
             }
         }
+        getline(file, line);
+        assert(line.size() == 0); 
     }
     parsed_ = true;
     DLOG(INFO) << "Value func loaded. Size = ("
