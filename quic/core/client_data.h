@@ -32,6 +32,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   int get_chunk_index();
   QuicBandwidth get_latest_rate_estimate();
   QuicBandwidth get_conservative_rate_estimate();
+  QuicBandwidth get_average_rate_estimate();
   double get_buffer_estimate();
   double get_screen_size();
   void set_bw_measurement_interval(QuicTime::Delta interval);
@@ -94,6 +95,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   Video vid_;
   std::string trace_file_;
   ValueFunc* value_func_;
+  QuicBandwidth avg_rate_;
   std::vector<int> bitrates_;
   std::string vid_prefix_;
 };

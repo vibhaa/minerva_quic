@@ -56,7 +56,8 @@ ValueFuncAware::ValueFuncAware(
       start_time_(clock->WallNow()),
       transport_(transport),
       bw_log_file_(),
-      max_weight_(5.0) {
+      max_weight_(5.0),
+      value_(0.0) {
           ReadArgs();
           if (transport_ == transFast) {
               rate_measurement_interval_ = QuicTime::Delta::FromMilliseconds(250);
@@ -261,14 +262,14 @@ double ValueFuncAware::AverageExpectedQoe(QuicBandwidth rate) {
     double cur_qoe = client_data_->qoe(client_data_->current_bitrate(), rebuf_time,
         client_data_->prev_bitrate());
     buf += 4.0;
-    double value = client_data_->get_value_func()->ValueFor(
+    value_ = client_data_->get_value_func()->ValueFor(
             buf, ((double)rate.ToBitsPerSecond())/(1000.0 * 1000.0),
             client_data_->current_bitrate());
     double past_qoe_weight = client_data_->get_chunk_index();
     double cur_chunk_weight = 1.0;
     double value_weight = client_data_->get_value_func()->Horizon();
     double avg_est_qoe = cur_qoe * cur_chunk_weight;
-    avg_est_qoe += value * value_weight / client_data_->get_value_func()->Horizon();
+    avg_est_qoe += value_ * value_weight / client_data_->get_value_func()->Horizon();
     if (client_data_->get_chunk_index() > 0) {
         avg_est_qoe += (client_data_->get_past_qoe()) * past_qoe_weight/(client_data_->get_chunk_index());
     }
@@ -277,7 +278,7 @@ double ValueFuncAware::AverageExpectedQoe(QuicBandwidth rate) {
     //    (client_data_->get_chunk_index() + 1 + client_data_->get_value_func()->Horizon());
     DLOG(INFO) << "Past qoe = " << client_data_->get_past_qoe()
         << ", cur chunk qoe = " << cur_qoe
-        << ", value = " << value
+        << ", value = " << value_
         << ", ss = " << client_data_->get_screen_size()
         << ", avg est qoe = " << avg_est_qoe; 
     return avg_est_qoe;
@@ -350,11 +351,13 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     if (adjusted_utility == 0) {
         adjusted_utility = 0.1;
     }
-    if (client_data_->get_chunk_index() >= 0) {
+    if (client_data_->get_chunk_index() >= 1) {
         // The target now lies in [30/11, 30/1] = [2.7, 30].
         target = 10.0 * rate.ToKBitsPerSecond()/(1000.0 * (adjusted_utility));
     } else {
-        target = fmax(10, 8.0/client_data_->utility_for_bitrate(client_data_->current_bitrate()));
+
+        target = 1;
+        //target = fmax(10, 8.0/client_data_->utility_for_bitrate(client_data_->current_bitrate()));
     }
     DLOG(INFO) << "Utility = " << utility
         << ", adjusted avg utility w/ sigmoid = " << adjusted_utility
@@ -430,10 +433,15 @@ void ValueFuncAware::MaybeIncreaseCwnd(
                      << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
                      << ", \"clientId\": " << client_data_->get_client_id()
                      << ", \"bandwidth_Mbps\": " << client_data_->get_latest_rate_estimate().ToKBitsPerSecond()/1000.0
+                     << ", \"estimated_bandwidth_Mbps\": " << client_data_->get_conservative_rate_estimate().ToKBitsPerSecond()/1000.0
+                     << ", \"average_est_bandwidth_Mbps\": " << client_data_->get_average_rate_estimate().ToKBitsPerSecond()/1000.0
+                   
                      << ", \"congestion_window\": "<< congestion_window_
                      << ", \"latest_rtt\": " << rtt_stats_->latest_rtt().ToMilliseconds()
                      << ", \"screen_size\": " << ss
                      << ", \"multiplier\": " << multiplier_
+                     << ", \"value\": " << value_
+                     << ", \"past_qoe\": " << client_data_->get_past_qoe()
                      << "}\n";
       }
   }

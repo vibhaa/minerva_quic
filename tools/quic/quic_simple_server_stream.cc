@@ -108,6 +108,10 @@ void QuicSimpleServerStream::PushResponse(
 std::map<string, string> QuicSimpleServerStream::ParseClientParams(string path_string) {
   // extract buffer and screen size from the path
   std::map<string, string> param_map;
+  if (path_string.find("Header") != std::string::npos) {
+      DLOG(INFO) << "header ignoring";
+      return param_map;
+  }
   auto pos = path_string.find('?');
   if (pos == std::string::npos) {
     DLOG(INFO) << "no params";
