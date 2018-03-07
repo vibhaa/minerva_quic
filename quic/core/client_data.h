@@ -24,6 +24,9 @@ class QUIC_EXPORT_PRIVATE ClientData {
   ClientData(const QuicClock* clock);
   ~ClientData();
 
+  enum VfType {interp, fit, raw};
+  enum OptTarget {maxmin, propfair};
+  
   void new_chunk(int bitrate, QuicByteCount chunk_size);
   void reset_chunk_remainder(QuicByteCount x);
   // Returns true when there's a new rate estimate available.
@@ -51,6 +54,9 @@ class QUIC_EXPORT_PRIVATE ClientData {
   ValueFunc* get_value_func();
   // Load the value function from a file.
   void load_value_function(const std::string& file);
+  void set_vf_type(const std::string& vf_type);
+  void set_opt_target(const std::string& opt_target);
+  OptTarget opt_target();
 
   // Getter and setter to store / return the last qoe.
   // The last qoe is not updated by QUIC at all.
@@ -98,6 +104,8 @@ class QUIC_EXPORT_PRIVATE ClientData {
   QuicBandwidth avg_rate_;
   std::vector<int> bitrates_;
   std::string vid_prefix_;
+  VfType vf_type_;
+  OptTarget opt_target_;
 };
 
 }  // namespace net

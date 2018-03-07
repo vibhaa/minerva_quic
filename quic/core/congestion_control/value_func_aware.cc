@@ -247,7 +247,6 @@ double ValueFuncAware::AverageExpectedQoe(QuicBandwidth rate) {
         buf -= ((double)cs)/rate.ToBytesPerSecond();
         if (buf < 0) {
             rebuf_time = -buf;
-            buf = 0.0;
         } else {
             rebuf_time = 0.0;
         }
@@ -261,7 +260,7 @@ double ValueFuncAware::AverageExpectedQoe(QuicBandwidth rate) {
         << ", prev bitrate " << client_data_->prev_bitrate();
     double cur_qoe = client_data_->qoe(client_data_->current_bitrate(), rebuf_time,
         client_data_->prev_bitrate());
-    buf += 4.0;
+    buf = fmax(0.0, buf) + 4.0;
     value_ = client_data_->get_value_func()->ValueFor(
             buf, ((double)rate.ToBitsPerSecond())/(1000.0 * 1000.0),
             client_data_->current_bitrate());
@@ -270,10 +269,12 @@ double ValueFuncAware::AverageExpectedQoe(QuicBandwidth rate) {
     double value_weight = client_data_->get_value_func()->Horizon();
     double avg_est_qoe = cur_qoe * cur_chunk_weight;
     avg_est_qoe += value_ * value_weight / client_data_->get_value_func()->Horizon();
+    double total_weight = value_weight + cur_chunk_weight;
     if (client_data_->get_chunk_index() > 0) {
         avg_est_qoe += (client_data_->get_past_qoe()) * past_qoe_weight/(client_data_->get_chunk_index());
+        total_weight += past_qoe_weight;
     }
-    avg_est_qoe /= (past_qoe_weight + 1 + value_weight);
+    avg_est_qoe /= total_weight;
     //double avg_est_qoe = (client_data_->get_past_qoe() + cur_qoe + value) /
     //    (client_data_->get_chunk_index() + 1 + client_data_->get_value_func()->Horizon());
     DLOG(INFO) << "Past qoe = " << client_data_->get_past_qoe()
@@ -299,8 +300,9 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         << ((double)rate.ToBitsPerSecond()) / real_rate.ToBitsPerSecond();
     double utility;
     double adjusted_utility;
-    bool prop_fairness = false; // EXPERIMENTAL!
-    
+    bool prop_fairness = (client_data_->opt_target() == ClientData::OptTarget::propfair); // EXPERIMENTAL!
+    DLOG(INFO) << "Optimization target is prop fairness? " << prop_fairness;
+
     if (!prop_fairness) {
         utility = AverageExpectedQoe(rate);
         if (utility > 30) {

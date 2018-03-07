@@ -134,6 +134,8 @@ std::map<string, string> QuicSimpleServerStream::ParseClientParams(string path_s
   string value_func = param_map["value_func"];
   string past_qoe = param_map["qoe"];
   string vid_prefix = param_map["vid_prefix"];
+  string vf_type = param_map["vf_type"];
+  string opt_target = param_map["opt"];
   QUIC_DVLOG(0) << "url is " << path_string << "  buffer is" << buffer << "screen size is" << screen;
 
   ClientData *cdata = spdy_session()->get_client_data();
@@ -147,6 +149,12 @@ std::map<string, string> QuicSimpleServerStream::ParseClientParams(string path_s
   if (past_qoe.length() > 0)
     cdata->set_past_qoe(stod(past_qoe));
   if (value_func.length() > 0) {
+    if (vf_type.length() > 0) {
+        cdata->set_vf_type(vf_type);
+    }
+    if (opt_target.length() > 0) {
+        cdata->set_opt_target(opt_target);
+    }
     string vf_dir = "/home/ubuntu/value_funcs/";
     cdata->load_value_function(vf_dir + value_func);
   }

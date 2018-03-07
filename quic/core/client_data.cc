@@ -11,6 +11,7 @@
 #include "net/quic/platform/api/quic_clock.h"
 #include "net/quic/platform/api/quic_logging.h"
 
+
 namespace net {
 
 ClientData::ClientData(const QuicClock* clock)
@@ -32,7 +33,9 @@ ClientData::ClientData(const QuicClock* clock)
       bw_measurements_(),
       value_func_(new ValueFuncRaw()),
       avg_rate_(QuicBandwidth::Zero()),
-      bitrates_() {}
+      bitrates_(),
+      vf_type_(),
+      opt_target_() {}
 
 ClientData::~ClientData() {
     delete value_func_;
@@ -178,11 +181,43 @@ void ClientData::set_trace_file(std::string f) {
   trace_file_ = f;
 }
 
+void ClientData::set_vf_type(const std::string& vf_type) {
+    if (vf_type == "fit") {
+        vf_type_ = fit;
+    } else if (vf_type == "raw") {
+        vf_type_ = raw;
+    } else {
+        vf_type_ = interp;
+    }
+}
+
+void ClientData::set_opt_target(const std::string& opt_target) {
+    if (opt_target == "propfair") {
+        opt_target_ = propfair;
+    } else {
+        opt_target_ = maxmin;
+    }
+}
+
+ClientData::OptTarget ClientData::opt_target() {
+    return opt_target_;
+}
+
 void ClientData::load_value_function(const std::string& filename) {
     DLOG(INFO) << "Setting value function from " << filename;
     delete value_func_;
     // Change this to ValueFuncFit for a quadratic fit.
-    value_func_ = new ValueFuncInterp(filename);
+    switch (vf_type_) {
+        case interp:
+            value_func_ = new ValueFuncInterp(filename);
+            break;
+        case fit:
+            value_func_ = new ValueFuncFit(filename);
+            break;
+        case raw:
+            value_func_ = new ValueFuncRaw(filename);
+            break;
+    }
 }
 
 ValueFunc* ClientData::get_value_func() {

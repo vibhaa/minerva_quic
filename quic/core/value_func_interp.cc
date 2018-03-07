@@ -60,7 +60,7 @@ double ValueFuncInterp::ValueFor(double buffer, double rate, int prev_bitrate) {
     } else {
         ix = FindBinarySearch(params[0], 0, params[0].size()-1, buffer);
     }
-    DLOG(INFO) << "Got index " << ix;
+    DLOG(INFO) << "Got index " << ix << " for buffer " << buffer;
     double value = 0;
     if (ix == params[0].size() - 1) {
         value = params[1][params[1].size() - 1];
