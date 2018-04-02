@@ -54,8 +54,10 @@ double ValueFuncInterp::ValueFor(double buffer, double rate, int prev_bitrate) {
     vector<vector<double>> params = values_[rate_ix][br_ix];
 
     DLOG(INFO) << "Binary search on size " << params[0].size();
+    double maxbuf = 19.99;
+    double maxval = params[1][params[1].size() - 1];
     size_t ix;
-    if (buffer >= 19.99) {
+    if (buffer >= maxbuf) {
         ix = params[0].size() - 1;
     } else {
         ix = FindBinarySearch(params[0], 0, params[0].size()-1, buffer);
@@ -63,7 +65,7 @@ double ValueFuncInterp::ValueFor(double buffer, double rate, int prev_bitrate) {
     DLOG(INFO) << "Got index " << ix << " for buffer " << buffer;
     double value = 0;
     if (ix == params[0].size() - 1) {
-        value = params[1][params[1].size() - 1];
+        value = maxval;
     } else {
         assert(buffer >= params[0][ix]);
         assert(buffer <= params[0][ix+1]);
@@ -76,7 +78,6 @@ double ValueFuncInterp::ValueFor(double buffer, double rate, int prev_bitrate) {
             value = params[1][ix] * (1 - proportion) + params[1][ix+1] * proportion;
         }
     }
-    //double value = params[0] + params[1] * buffer;
     DLOG(INFO) << "Params buffer=" << buffer << ", rate=" << rate
         << ", prev_bitrate=" << prev_bitrate << ", br_ix=" << br_ix
         << ", rate_ix=" << rate_ix << ", value=" << value;    

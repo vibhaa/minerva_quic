@@ -119,6 +119,8 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
   // Current buffer estimate from the client.
   double multiplier_;
 
+  int64_t rate_ewma_;
+
   QuicWallTime last_weight_update_time_;
 
   // The time over which we compute a rate.
@@ -143,6 +145,8 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
 
   // value computed at each update
   double value_;
+
+  double adjusted_value_;
   std::vector<std::string> read_options;
 
   DISALLOW_COPY_AND_ASSIGN(ValueFuncAware);

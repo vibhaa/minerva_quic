@@ -33,6 +33,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   bool update_chunk_remainder(QuicByteCount x);
   QuicByteCount get_chunk_remainder();
   int get_chunk_index();
+  int get_num_bw_estimates();
   QuicBandwidth get_latest_rate_estimate();
   QuicBandwidth get_conservative_rate_estimate();
   QuicBandwidth get_average_rate_estimate();

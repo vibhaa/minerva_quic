@@ -50,6 +50,7 @@ ValueFuncAware::ValueFuncAware(
       client_data_(nullptr),
       last_time_(QuicWallTime::Zero()),
       multiplier_(1.0),
+      rate_ewma_(-1),
       last_weight_update_time_(clock->WallNow()),
       rate_measurement_interval_(QuicTime::Delta::FromMilliseconds(1000)),
       weight_update_horizon_(QuicTime::Delta::FromMilliseconds(1000)),
@@ -57,7 +58,8 @@ ValueFuncAware::ValueFuncAware(
       transport_(transport),
       bw_log_file_(),
       max_weight_(5.0),
-      value_(0.0) {
+      value_(0.0),
+      adjusted_value_(0.0) {
           ReadArgs();
           if (transport_ == transFast) {
               rate_measurement_interval_ = QuicTime::Delta::FromMilliseconds(250);
@@ -169,7 +171,8 @@ double ValueFuncAware::ReadMaxWeight() {
 
 void ValueFuncAware::UpdateWithAck(QuicByteCount acked_bytes) {
     if (client_data_ != nullptr) {
-        new_rate_update_ = new_rate_update_ || client_data_->record_acked_bytes(acked_bytes);
+        bool record = client_data_->record_acked_bytes(acked_bytes);
+        new_rate_update_ = new_rate_update_ || record;
     }
 }
 
@@ -261,20 +264,25 @@ double ValueFuncAware::AverageExpectedQoe(QuicBandwidth rate) {
     double cur_qoe = client_data_->qoe(client_data_->current_bitrate(), rebuf_time,
         client_data_->prev_bitrate());
     buf = fmax(0.0, buf) + 4.0;
-    value_ = client_data_->get_value_func()->ValueFor(
+    double value = client_data_->get_value_func()->ValueFor(
             buf, ((double)rate.ToBitsPerSecond())/(1000.0 * 1000.0),
             client_data_->current_bitrate());
-    double past_qoe_weight = client_data_->get_chunk_index();
+    double past_qoe_weight = fmin(10, client_data_->get_chunk_index());
     double cur_chunk_weight = 1.0;
     double value_weight = client_data_->get_value_func()->Horizon();
-    double avg_est_qoe = cur_qoe * cur_chunk_weight;
-    avg_est_qoe += value_ * value_weight / client_data_->get_value_func()->Horizon();
-    double total_weight = value_weight + cur_chunk_weight;
+    double avg_est_qoe = value * value_weight / client_data_->get_value_func()->Horizon();
+    double total_weight = value_weight;
     if (client_data_->get_chunk_index() > 0) {
         avg_est_qoe += (client_data_->get_past_qoe()) * past_qoe_weight/(client_data_->get_chunk_index());
         total_weight += past_qoe_weight;
+        avg_est_qoe += cur_qoe * cur_chunk_weight;
+        total_weight += cur_chunk_weight;
+    } else {
+        avg_est_qoe += 10 * past_qoe_weight;
+        total_weight += past_qoe_weight;
     }
     avg_est_qoe /= total_weight;
+    value_ = avg_est_qoe;
     //double avg_est_qoe = (client_data_->get_past_qoe() + cur_qoe + value) /
     //    (client_data_->get_chunk_index() + 1 + client_data_->get_value_func()->Horizon());
     DLOG(INFO) << "Past qoe = " << client_data_->get_past_qoe()
@@ -294,10 +302,20 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         return;
     }
     new_rate_update_ = false;
+    if (client_data_->get_num_bw_estimates() < 4) {
+        return;
+    }
     QuicBandwidth real_rate = client_data_->get_latest_rate_estimate();
     QuicBandwidth rate = client_data_->get_conservative_rate_estimate();
     DLOG(INFO) << "Conservative rate estimate " << rate << ", real rate " << real_rate << ", ratio = "
         << ((double)rate.ToBitsPerSecond()) / real_rate.ToBitsPerSecond();
+    double rate_ewma_factor = 0.1;
+    if (rate_ewma_ < 0) {
+        rate_ewma_ = rate.ToBitsPerSecond();
+    }
+    rate_ewma_ = (int64_t)(rate_ewma_factor * rate.ToBitsPerSecond() + (1 - rate_ewma_factor) * rate_ewma_);
+    rate = QuicBandwidth::FromBitsPerSecond(rate_ewma_);
+    
     double utility;
     double adjusted_utility;
     bool prop_fairness = (client_data_->opt_target() == ClientData::OptTarget::propfair); // EXPERIMENTAL!
@@ -353,9 +371,9 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     if (adjusted_utility == 0) {
         adjusted_utility = 0.1;
     }
+    adjusted_value_ = adjusted_utility;
     if (client_data_->get_chunk_index() >= 1) {
-        // The target now lies in [30/11, 30/1] = [2.7, 30].
-        target = 10.0 * rate.ToKBitsPerSecond()/(1000.0 * (adjusted_utility));
+        target = 10.0 * rate.ToKBitsPerSecond()/(1000.0 * (adjusted_value_+1));
     } else {
 
         target = 1;
@@ -373,7 +391,8 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     DLOG(INFO) << "Updated weight after " << time_elapsed << " and ewma weight " << gamma;
     multiplier_ = (1 - gamma) * target + gamma * multiplier_;*/
     // SET FOR IMMEDIATE WEIGHT.
-    multiplier_ = target;
+    float mult_ewma = 0.2;
+    multiplier_ = mult_ewma * target + (1 - mult_ewma) * multiplier_;
     if (max_weight_ > 0) {
         multiplier_ = fmax(fmin(multiplier_, 5.0), 1.0);
     } else {
@@ -384,7 +403,6 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     }
 
     DLOG(INFO) << "Got multiplier " << multiplier_;
-   
     // UNCOMMENT BELOW TO SET MAX WEIGHT.
     //multiplier_ = fmax(fmin(multiplier_, max_weight_), 1);
     SetWeight(multiplier_);
@@ -421,10 +439,10 @@ void ValueFuncAware::MaybeIncreaseCwnd(
   UpdateCwndMultiplier();
   // Adjust the CWND multiplier as needed. Works better on Reno than 
   if (client_data_ != nullptr) {
+      client_data_->set_bw_measurement_interval(rate_measurement_interval_);
       if (!bw_log_file_.is_open()) {
           std::string filename = "quic_bw_vf_" + std::to_string(client_data_->get_client_id()) + ".log";
           bw_log_file_.open(filename, std::ios::trunc);
-          client_data_->set_bw_measurement_interval(rate_measurement_interval_);
       }
       double ss = client_data_->get_screen_size();
       QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_time_);
@@ -443,6 +461,8 @@ void ValueFuncAware::MaybeIncreaseCwnd(
                      << ", \"screen_size\": " << ss
                      << ", \"multiplier\": " << multiplier_
                      << ", \"value\": " << value_
+                     << ", \"adjusted_value\": " << adjusted_value_
+                     << ", \"rate_ewma\": " << rate_ewma_ / 1000000.0
                      << ", \"past_qoe\": " << client_data_->get_past_qoe()
                      << "}\n";
       }

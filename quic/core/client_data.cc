@@ -69,10 +69,10 @@ bool ClientData::update_chunk_remainder(QuicByteCount x) {
     QuicTime::Delta interval = last_record_time_.AbsoluteDifference(last_measurement_start_time_);
     if (interval > bw_measurement_interval_) {
         QuicBandwidth meas = QuicBandwidth::FromBytesAndTimeDelta(bytes_since_last_measurement_, interval);
-        DLOG(INFO) << "BYTEs ARE" << bytes_since_last_measurement_ << "interval is" << interval << "measurement is" << meas;
+        DLOG(INFO) << "BYTEs ARE " << bytes_since_last_measurement_ << ", interval is " << interval << "measurement is" << meas;
         int num_measurements = bw_measurements_.size();
         if (num_measurements > 3){
-            DLOG(INFO) << "last three measurements are" << bw_measurements_[num_measurements-3] 
+            DLOG(INFO) << "last three measurements are " << bw_measurements_[num_measurements-3] 
                 << bw_measurements_[num_measurements-2]
                 << bw_measurements_[num_measurements-1] ;
         }
@@ -96,6 +96,10 @@ QuicBandwidth ClientData::get_latest_rate_estimate() {
         return QuicBandwidth::Zero();
     }
     return bw_measurements_[bw_measurements_.size() - 1];
+}
+
+int ClientData::get_num_bw_estimates() {
+    return bw_measurements_.size();
 }
 
 QuicBandwidth ClientData::get_conservative_rate_estimate() {

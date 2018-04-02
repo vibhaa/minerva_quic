@@ -40,8 +40,10 @@ double ValueFuncFit::ValueFor(double buffer, double rate, int prev_bitrate) {
     int br_ix = br_inverse_[prev_bitrate];
     vector<double> params = values_[rate_ix][br_ix];
     // The params are the a,b,c for: a - b*exp(-cx)
-    double value = params[0] * buffer * buffer + params[1] * buffer + params[2];
-    //double value = params[0] + params[1] * buffer;
+    double value = params[0] - params[1] * exp(params[2]*buffer);
+    //double maxbuf = 19.99;
+    //double maxval = params[0] * maxbuf * maxbuf + params[1] * maxbuf + params[2];
+    //value = 2 * maxval * buffer / maxbuf - value;
     DLOG(INFO) << "Params buffer=" << buffer << ", rate=" << rate
         << ", prev_bitrate=" << prev_bitrate << ", br_ix=" << br_ix
         << ", rate_ix=" << rate_ix << ", value=" << value;    
