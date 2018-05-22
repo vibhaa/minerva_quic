@@ -19,6 +19,8 @@
 
 #define MAX_WEIGHT "max_weight"
 
+using namespace std;
+
 namespace net {
 
 namespace {
@@ -59,11 +61,13 @@ ValueFuncAware::ValueFuncAware(
       bw_log_file_(),
       max_weight_(5.0),
       value_(0.0),
-      adjusted_value_(0.0) {
+      adjusted_value_(0.0),
+      cubic_utility_fn_(10, std::vector<double>(2)) {
           ReadArgs();
           if (transport_ == transFast) {
               rate_measurement_interval_ = QuicTime::Delta::FromMilliseconds(250);
           }
+          InitCubicInverseFn();
       }
 
 ValueFuncAware::~ValueFuncAware() {
@@ -272,13 +276,13 @@ double ValueFuncAware::AverageExpectedQoe(QuicBandwidth rate) {
     double value_weight = client_data_->get_value_func()->Horizon();
     double avg_est_qoe = value * value_weight / client_data_->get_value_func()->Horizon();
     double total_weight = value_weight;
-    if (client_data_->get_chunk_index() > 0) {
+    avg_est_qoe += cur_qoe * cur_chunk_weight;
+    total_weight += cur_chunk_weight;
+    if (client_data_->get_chunk_index() > (int)past_qoe_weight) {
         avg_est_qoe += (client_data_->get_past_qoe()) * past_qoe_weight/(client_data_->get_chunk_index());
         total_weight += past_qoe_weight;
-        avg_est_qoe += cur_qoe * cur_chunk_weight;
-        total_weight += cur_chunk_weight;
     } else {
-        avg_est_qoe += 10 * past_qoe_weight;
+        avg_est_qoe += 10 * (past_qoe_weight - client_data_->get_chunk_index()) + client_data_->get_past_qoe();
         total_weight += past_qoe_weight;
     }
     avg_est_qoe /= total_weight;
@@ -293,6 +297,87 @@ double ValueFuncAware::AverageExpectedQoe(QuicBandwidth rate) {
     return avg_est_qoe;
 }
 
+// Given a function f, specified as a table, computes f^{-1}(val).
+double ValueFuncAware::GeneralFuncInverse(const vector<vector<double>>& table, double val) {
+    // The function is monotonically increasing, so search for the value in the table.
+    size_t upper_ix = 0;
+    for (size_t i = 0; i < table.size(); i++) {
+        if (val < table[i][1]) {
+            break;
+        }
+        upper_ix = i+1;
+    }
+    // Interpolate if necessary:
+    if (upper_ix == 0) {
+        return val * table[0][0] / table[0][1];
+    }
+    if (upper_ix == table.size()) {
+        return table[upper_ix-1][0];
+    }
+    double frac = (val - table[upper_ix-1][1])/(table[upper_ix][1] - table[upper_ix-1][1]);
+    return frac*table[upper_ix][0] + (1-frac)*table[upper_ix-1][0];
+}
+
+void ValueFuncAware::InitCubicInverseFn() {
+    // Hard code this for now for testing.
+    vector<vector<double>> vmaf1 {{0.375, 14.214970591},
+                                  {1.05, 37.8881577018},
+                                  {1.75, 49.4193675888},
+                                  {2.35, 59.3426629332},
+                                  {3.05, 66.3851950796},
+                                  {4.3, 77.019566865},
+                                  {5.8, 85.1433782961},
+                                  {7.5, 91.1899283228},
+                                  {15.0, 99.281165376},
+                                  {20.0, 99.8326275398}};
+    vector<vector<double>> vmaf2 {{0.375, 52.1474829247},
+                                  {0.75, 69.5570590818},
+                                  {1.05, 78.4550621593},
+                                  {1.75, 84.8456620831},
+                                  {3.05, 92.7166629274},
+                                  {4.3, 97.2253602622}};
+    vector<vector<double>> combined {{14.214970591, 0.0},
+                                     {37.8881577018, 0.0},
+                                     {49.4193675888, 0.0},
+                                     {52.1474829247, 0.0},
+                                     {59.3426629332, 0.0},
+                                     {66.3851950796, 0.0},
+                                     {69.5570590818, 0.0},
+                                     {77.019566865, 0.0},
+                                     {78.4550621593, 0.0},
+                                     {84.8456620831, 0.0},
+                                     {85.1433782961, 0.0},
+                                     {91.1899283228, 0.0},
+                                     {92.7166629274, 0.0},
+                                     {97.2253602622, 0.0},
+                                     {99.8326275398, 0.0}};
+    for (size_t i = 0; i < combined.size(); i++) {
+        double val = GeneralFuncInverse(vmaf1, combined[i][0]) +
+            GeneralFuncInverse(vmaf2, combined[i][0]);
+        combined[i][1] = val;
+        DLOG(INFO) << "Combined (U1-1 + U2-1 fn " << i << ": " << combined[i][0] << ", " << val;
+    }
+
+    vector<double> rates = {0.375, 0.75, 1.05, 1.75, 2.35, 3.05, 4.3, 5.8, 7.5, 15.0};
+    // At this point we have: combined(x) = (U_1^{-1}(x) + U_2^{-1}(x)).
+    // Now we need f^{-1}(x) = combined^{-1}(2x)
+    for (size_t i = 0; i < cubic_utility_fn_.size(); i++) {
+        cubic_utility_fn_[i][0] = rates[i];
+        double val = GeneralFuncInverse(combined, 2*rates[i]) / 5;
+        cubic_utility_fn_[i][1] = val;
+        DLOG(INFO) << " Cubic utility fn " << i << ": " << rates[i] << ", " << val ;
+    }
+}
+
+// In order to make sure that the weights all average to some constant (since they're used
+// to emulate that many cubic flows), we want to compose some function f with the utility:
+// w = r/f(U(r)). It turns out that this function can be defined by its inverse:
+// f^{-1}(x) = [\sum_i U_i^{-1}](nx) if there are n clients. f^{-1} can be viewed as the
+// utility function for a Cubic flow.
+double ValueFuncAware::ComputeCubicInverse(double arg) {
+    return GeneralFuncInverse(cubic_utility_fn_, arg) / 2;    
+}
+
 void ValueFuncAware::UpdateCwndMultiplier() {
     // DLOG(INFO) << "Updating congestion window " << congestion_window_;
     if (client_data_ == nullptr) {
@@ -302,7 +387,7 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         return;
     }
     new_rate_update_ = false;
-    if (client_data_->get_num_bw_estimates() < 4) {
+    if (client_data_->get_num_bw_estimates() < 10) {
         return;
     }
     QuicBandwidth real_rate = client_data_->get_latest_rate_estimate();
@@ -371,9 +456,11 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     if (adjusted_utility == 0) {
         adjusted_utility = 0.1;
     }
-    adjusted_value_ = adjusted_utility;
+    //adjusted_value_ = (adjusted_utility*adjusted_utility/20.0 + 1)/10.0;
+    adjusted_value_ = ComputeCubicInverse(adjusted_utility);
     if (client_data_->get_chunk_index() >= 1) {
-        target = 10.0 * rate.ToKBitsPerSecond()/(1000.0 * (adjusted_value_+1));
+        // The Cubic inverse is in Mbps. Convert to Kbps.
+        target = rate.ToKBitsPerSecond()/(1000.0 * (adjusted_value_));
     } else {
 
         target = 1;
@@ -381,6 +468,7 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     }
     DLOG(INFO) << "Utility = " << utility
         << ", adjusted avg utility w/ sigmoid = " << adjusted_utility
+        << ", value of utility = " << adjusted_value_
         << ", rate = " << rate.ToKBitsPerSecond()
         << ", target (packets) = " << target;
     
@@ -413,7 +501,8 @@ void ValueFuncAware::UpdateCwndMultiplier() {
 }
 
 void ValueFuncAware::UpdateCwndFastTCP() {
-    double target = 5 * weight_;
+    // If we're aiming for an average of 2 cubic flows per video flow, there will be 20 packets in the queue per flow on average.
+    double target = 10 * weight_;
     double gamma = 0.8;
     double minrtt = rtt_stats_->min_rtt().ToMilliseconds();
     double new_wnd = (minrtt / rtt_stats_->latest_rtt().ToMilliseconds()) * congestion_window_ +

@@ -78,6 +78,9 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
 
   bool isOption(std::string s);
   double ReadMaxWeight();
+  void InitCubicInverseFn();
+  double GeneralFuncInverse(const std::vector<std::vector<double>>& table, double arg);
+  double ComputeCubicInverse(double arg);
 
  private:
   friend class test::ValueFuncAwarePeer;
@@ -149,6 +152,7 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
   double adjusted_value_;
   std::vector<std::string> read_options;
 
+  std::vector<std::vector<double>> cubic_utility_fn_;
   DISALLOW_COPY_AND_ASSIGN(ValueFuncAware);
 
 };
