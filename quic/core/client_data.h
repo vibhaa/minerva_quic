@@ -6,6 +6,8 @@
 #ifndef NET_QUIC_CORE_CLIENT_DATA_H_
 #define NET_QUIC_CORE_CLIENT_DATA_H_
 
+#include <vector>
+
 #include "base/macros.h"
 #include "net/quic/core/quic_bandwidth.h"
 #include "net/quic/core/quic_time.h"
@@ -76,6 +78,11 @@ class QUIC_EXPORT_PRIVATE ClientData {
   // Returns the bitrate before the current one, or 0 if N/A.
   int prev_bitrate();
 
+  double average_expected_qoe(QuicBandwidth cur_rate);
+  double generic_fn_inverse(const std::vector<std::vector<double>>& table, double arg);
+  void init_cubic_inverse();
+  double compute_cubic_inverse(double arg);
+
  private:
   void reset_bw_measurement();
   
@@ -107,6 +114,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   std::string vid_prefix_;
   VfType vf_type_;
   OptTarget opt_target_;
+  std::vector<std::vector<double>> cubic_utility_fn_;
 };
 
 }  // namespace net

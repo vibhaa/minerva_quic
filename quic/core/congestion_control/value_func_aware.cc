@@ -407,7 +407,8 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     DLOG(INFO) << "Optimization target is prop fairness? " << prop_fairness;
 
     if (!prop_fairness) {
-        utility = AverageExpectedQoe(rate);
+        utility = client_data_->average_expected_qoe(rate);
+        value_ = utility;
         if (utility > 30) {
             adjusted_utility = 30.0;
         }
@@ -457,7 +458,7 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         adjusted_utility = 0.1;
     }
     //adjusted_value_ = (adjusted_utility*adjusted_utility/20.0 + 1)/10.0;
-    adjusted_value_ = ComputeCubicInverse(adjusted_utility);
+    adjusted_value_ = client_data_->compute_cubic_inverse(adjusted_utility);
     if (client_data_->get_chunk_index() >= 1) {
         // The Cubic inverse is in Mbps. Convert to Kbps.
         target = rate.ToKBitsPerSecond()/(1000.0 * (adjusted_value_));

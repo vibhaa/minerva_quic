@@ -11,6 +11,7 @@
 #include "net/quic/platform/api/quic_clock.h"
 #include "net/quic/platform/api/quic_logging.h"
 
+using namespace std;
 
 namespace net {
 
@@ -35,7 +36,10 @@ ClientData::ClientData(const QuicClock* clock)
       avg_rate_(QuicBandwidth::Zero()),
       bitrates_(),
       vf_type_(),
-      opt_target_() {}
+      opt_target_(),
+      cubic_utility_fn_(10, std::vector<double>(2)) {
+        init_cubic_inverse();
+      }
 
 ClientData::~ClientData() {
     delete value_func_;
@@ -274,6 +278,129 @@ void ClientData::set_vid_prefix(std::string f) {
 
 Video* ClientData::get_vid() {
   return & vid_;
+}
+
+double ClientData::average_expected_qoe(QuicBandwidth rate) {
+    QuicByteCount cs = get_chunk_remainder();
+    double buf = get_buffer_estimate();
+    // Adjust the buffer for dash.
+    buf -= 0.6;
+    double rebuf_time = 100.0;
+    if (rate.ToBytesPerSecond() > 0) { 
+        buf -= ((double)cs)/rate.ToBytesPerSecond();
+        if (buf < 0) {
+            rebuf_time = -buf;
+        } else {
+            rebuf_time = 0.0;
+        }
+    }
+    DLOG(INFO) << "Chunk remainder (bytes) = " << cs
+        << ", buffer = " << buf
+        << ", ss = " << get_screen_size()
+        << ", chunk_ix = " << get_chunk_index()
+        << ", rate estimate = " << rate.ToKBitsPerSecond();
+    DLOG(INFO) << "current bitrate " << current_bitrate()
+        << ", prev bitrate " << prev_bitrate();
+    double cur_qoe = qoe(current_bitrate(), rebuf_time, prev_bitrate());
+    buf = fmax(0.0, buf) + 4.0;
+    double value = get_value_func()->ValueFor(
+            buf, ((double)rate.ToBitsPerSecond())/(1000.0 * 1000.0),
+            current_bitrate());
+    double past_qoe_weight = fmin(10, get_chunk_index());
+    double cur_chunk_weight = 1.0;
+    double value_weight = get_value_func()->Horizon();
+    double avg_est_qoe = value * value_weight / get_value_func()->Horizon();
+    double total_weight = value_weight;
+    avg_est_qoe += cur_qoe * cur_chunk_weight;
+    total_weight += cur_chunk_weight;
+    if (get_chunk_index() > (int)past_qoe_weight) {
+        avg_est_qoe += (get_past_qoe()) * past_qoe_weight/(get_chunk_index());
+        total_weight += past_qoe_weight;
+    } else {
+        avg_est_qoe += 10 * (past_qoe_weight - get_chunk_index()) + get_past_qoe();
+        total_weight += past_qoe_weight;
+    }
+    avg_est_qoe /= total_weight;
+    DLOG(INFO) << "Past qoe = " << get_past_qoe()
+        << ", cur chunk qoe = " << cur_qoe
+        << ", ss = " << get_screen_size()
+        << ", avg est qoe = " << avg_est_qoe; 
+    return avg_est_qoe;
+}
+
+double ClientData::generic_fn_inverse(const vector<vector<double>>& table, double val) {
+    // The function is monotonically increasing, so search for the value in the table.
+    size_t upper_ix = 0;
+    for (size_t i = 0; i < table.size(); i++) {
+        if (val < table[i][1]) {
+            break;
+        }
+        upper_ix = i+1;
+    }
+    // Interpolate if necessary:
+    if (upper_ix == 0) {
+        return val * table[0][0] / table[0][1];
+    }
+    if (upper_ix == table.size()) {
+        return table[upper_ix-1][0];
+    }
+    double frac = (val - table[upper_ix-1][1])/(table[upper_ix][1] - table[upper_ix-1][1]);
+    return frac*table[upper_ix][0] + (1-frac)*table[upper_ix-1][0];
+}
+
+void ClientData::init_cubic_inverse() {
+    // Hard code this for now for testing.
+    vector<vector<double>> vmaf1 {{0.375, 14.214970591},
+                                  {1.05, 37.8881577018},
+                                  {1.75, 49.4193675888},
+                                  {2.35, 59.3426629332},
+                                  {3.05, 66.3851950796},
+                                  {4.3, 77.019566865},
+                                  {5.8, 85.1433782961},
+                                  {7.5, 91.1899283228},
+                                  {15.0, 99.281165376},
+                                  {20.0, 99.8326275398}};
+    vector<vector<double>> vmaf2 {{0.375, 52.1474829247},
+                                  {0.75, 69.5570590818},
+                                  {1.05, 78.4550621593},
+                                  {1.75, 84.8456620831},
+                                  {3.05, 92.7166629274},
+                                  {4.3, 97.2253602622}};
+    vector<vector<double>> combined {{14.214970591, 0.0},
+                                     {37.8881577018, 0.0},
+                                     {49.4193675888, 0.0},
+                                     {52.1474829247, 0.0},
+                                     {59.3426629332, 0.0},
+                                     {66.3851950796, 0.0},
+                                     {69.5570590818, 0.0},
+                                     {77.019566865, 0.0},
+                                     {78.4550621593, 0.0},
+                                     {84.8456620831, 0.0},
+                                     {85.1433782961, 0.0},
+                                     {91.1899283228, 0.0},
+                                     {92.7166629274, 0.0},
+                                     {97.2253602622, 0.0},
+                                     {99.8326275398, 0.0}};
+    for (size_t i = 0; i < combined.size(); i++) {
+        double val = generic_fn_inverse(vmaf1, combined[i][0]) +
+            generic_fn_inverse(vmaf2, combined[i][0]);
+        combined[i][1] = val;
+        DLOG(INFO) << "Combined (U1-1 + U2-1 fn " << i << ": " << combined[i][0] << ", " << val;
+    }
+
+    vector<double> rates = {0.375, 0.75, 1.05, 1.75, 2.35, 3.05, 4.3, 5.8, 7.5, 15.0};
+    // At this point we have: combined(x) = (U_1^{-1}(x) + U_2^{-1}(x)).
+    // Now we need f^{-1}(x) = combined^{-1}(2x)
+    for (size_t i = 0; i < cubic_utility_fn_.size(); i++) {
+        cubic_utility_fn_[i][0] = rates[i];
+        double val = generic_fn_inverse(combined, 2*rates[i]) / 5;
+        cubic_utility_fn_[i][1] = val;
+        DLOG(INFO) << " Cubic utility fn " << i << ": " << rates[i] << ", " << val ;
+    }
+}
+
+double ClientData::compute_cubic_inverse(double arg) {
+    return generic_fn_inverse(cubic_utility_fn_, arg) / 2;
 }
 
 }  // namespace net
