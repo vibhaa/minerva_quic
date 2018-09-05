@@ -21,7 +21,9 @@ ClientData::ClientData(const QuicClock* clock)
       client_id_(rand() % 10000 + 1),
       chunk_index_(-1),
       clock_(clock),
-      past_qoe_(0.0),
+      last_qoe_update_(0.0),
+      past_qoes_(NULL),
+      past_qoe_chunks_(0),
       chunk_remainder_(0),
       rebuf_penalty_(5.0),
       smooth_penalty_(1.0),
@@ -29,7 +31,7 @@ ClientData::ClientData(const QuicClock* clock)
       last_measurement_start_time_(clock->WallNow()),
       bytes_since_last_measurement_(0),
       last_record_time_(QuicWallTime::Zero()),
-      last_buffer_update_time_(QuicWallTime::Zero()),
+      last_buffer_update_time_(clock->WallNow()),
       bw_measurement_interval_(QuicTime::Delta::FromMilliseconds(500)),
       bw_measurements_(),
       value_func_(new ValueFuncRaw()),
@@ -37,11 +39,15 @@ ClientData::ClientData(const QuicClock* clock)
       bitrates_(),
       vf_type_(),
       opt_target_(),
-      cubic_utility_fn_(10, std::vector<double>(2)) {
+      cubic_utility_fn_(10, std::vector<double>(2)),
+      maxmin_util_inverse_fn_("/home/ubuntu/video_data/TennisSeekingInverseAvg.fit"),
+      sum_util_inverse_fn_("/home/ubuntu/video_data/TennisSeekingInverseDeriv.fit") {
+        past_qoes_ = new vector<double>();
         init_cubic_inverse();
       }
 
 ClientData::~ClientData() {
+    delete past_qoes_;
     delete value_func_;
 }
 
@@ -140,8 +146,11 @@ bool ClientData::record_acked_bytes(QuicByteCount x) {
 }
 
 double ClientData::get_buffer_estimate() {
-  return buffer_estimate_ -
-    clock_->WallNow().AbsoluteDifference(last_buffer_update_time_).ToSeconds();
+    double time_delta_sec = clock_->WallNow().AbsoluteDifference(last_buffer_update_time_).ToSeconds();
+    double est = buffer_estimate_ - time_delta_sec;
+    DLOG(INFO) << "Reading buffer estimate " << est << " at time " << clock_->WallNow().ToUNIXSeconds() << ", which is " <<
+        time_delta_sec << " after the previous write.";
+    return est;
 }
 
 double ClientData::get_screen_size() {
@@ -173,6 +182,7 @@ std::string ClientData::get_trace_file() {
 void ClientData::set_buffer_estimate(double current_buffer){
 	buffer_estimate_ = current_buffer;
     last_buffer_update_time_ = clock_->WallNow();
+    DLOG(INFO) << "Setting buffer estimate to " << buffer_estimate_ << " at time " << last_buffer_update_time_.ToUNIXSeconds();
 }
 
 void ClientData::set_screen_size(double ss){
@@ -202,6 +212,8 @@ void ClientData::set_vf_type(const std::string& vf_type) {
 void ClientData::set_opt_target(const std::string& opt_target) {
     if (opt_target == "propfair") {
         opt_target_ = propfair;
+    } else if (opt_target == "sum") {
+       opt_target_ = sum;
     } else {
         opt_target_ = maxmin;
     }
@@ -233,11 +245,23 @@ ValueFunc* ClientData::get_value_func() {
 }
 
 void ClientData::set_past_qoe(double qoe) {
-    past_qoe_ = qoe;
+    if (qoe > 0 && qoe != last_qoe_update_) {
+        double prev_chunk_qoe = qoe - last_qoe_update_;
+        if (past_qoe_chunks_ >= 0) {
+            past_qoes_->push_back(prev_chunk_qoe);
+        }
+        past_qoe_chunks_++;
+    }
+    last_qoe_update_ = qoe;
+
 }
 
 double ClientData::get_past_qoe() {
-    return past_qoe_;
+    double sum = 0;
+    for (const double q : *past_qoes_) {
+        sum += q;
+    }
+    return sum;
 }
 
 double ClientData::utility_for_bitrate(int bitrate) {
@@ -306,22 +330,29 @@ double ClientData::average_expected_qoe(QuicBandwidth rate) {
     double value = get_value_func()->ValueFor(
             buf, ((double)rate.ToBitsPerSecond())/(1000.0 * 1000.0),
             current_bitrate());
-    double past_qoe_weight = fmin(10, get_chunk_index());
+    value /= get_value_func()->Horizon();
+    int num_past_recorded_chunks = past_qoes_->size();
+    double past_qoe_weight = fmin(10, num_past_recorded_chunks);
     double cur_chunk_weight = 1.0;
     double value_weight = get_value_func()->Horizon();
-    double avg_est_qoe = value * value_weight / get_value_func()->Horizon();
+    double avg_est_qoe = value * value_weight;
     double total_weight = value_weight;
-    avg_est_qoe += cur_qoe * cur_chunk_weight;
-    total_weight += cur_chunk_weight;
-    if (get_chunk_index() > (int)past_qoe_weight) {
-        avg_est_qoe += (get_past_qoe()) * past_qoe_weight/(get_chunk_index());
+    if (num_past_recorded_chunks > (int)past_qoe_weight) {
+        avg_est_qoe += (get_past_qoe()) * past_qoe_weight/(num_past_recorded_chunks);
         total_weight += past_qoe_weight;
+        avg_est_qoe += cur_qoe * cur_chunk_weight;
+        total_weight += cur_chunk_weight;
     } else {
-        avg_est_qoe += 10 * (past_qoe_weight - get_chunk_index()) + get_past_qoe();
+        // Phase in the contributions from past QoE and current chunk over the first 10 chunks.
+        // If they're introduced too quickly / all at once, the multiplier will spike.
+        avg_est_qoe += value * (past_qoe_weight - num_past_recorded_chunks) + get_past_qoe();
         total_weight += past_qoe_weight;
+        avg_est_qoe += past_qoe_weight * cur_qoe / 10;
+        total_weight += past_qoe_weight / 10;
     }
     avg_est_qoe /= total_weight;
     DLOG(INFO) << "Past qoe = " << get_past_qoe()
+        << ", num qoe chunks = " << num_past_recorded_chunks
         << ", cur chunk qoe = " << cur_qoe
         << ", ss = " << get_screen_size()
         << ", avg est qoe = " << avg_est_qoe; 
@@ -399,8 +430,16 @@ void ClientData::init_cubic_inverse() {
     }
 }
 
-double ClientData::compute_cubic_inverse(double arg) {
-    return generic_fn_inverse(cubic_utility_fn_, arg) / 2;
+float ClientData::normalize_utility(float arg) {
+    switch (opt_target_) {
+        case maxmin:
+            return maxmin_util_inverse_fn_.Eval(arg) / 2; 
+        case sum:
+            return sum_util_inverse_fn_.Eval(arg) / 2;
+        case propfair:
+            return arg;
+    }
+    //return generic_fn_inverse(cubic_utility_fn_, arg) / 2;
 }
 
 }  // namespace net

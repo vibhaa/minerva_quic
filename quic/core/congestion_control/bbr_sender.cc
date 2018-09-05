@@ -458,7 +458,7 @@ void BbrSender::EnterProbeBandwidthMode(QuicTime now) {
   // Take a softplus function to remove negative values.
   qoe = log(1 + exp(qoe));
   value_ = qoe;
-  adjusted_value_ = client_data_->compute_cubic_inverse(qoe);
+  adjusted_value_ = client_data_->normalize_utility(qoe);
   double target_weight = 2.0;
   if (client_data_->get_chunk_index() >= 1) {
       target_weight = rate.ToKBitsPerSecond() / (1000.0 * adjusted_value_);

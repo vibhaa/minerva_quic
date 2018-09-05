@@ -269,6 +269,7 @@ QuicConnection::QuicConnection(
             GetQuicFlag(FLAGS_quic_default_to_vmaf_fast) ? kVMAFAwareFast : 
             GetQuicFlag(FLAGS_quic_default_to_propss_cubic) ? kPropSSCubic : 
             GetQuicFlag(FLAGS_quic_default_to_propss_fast) ? kPropSSFast : 
+            GetQuicFlag(FLAGS_quic_default_to_tcp_fast) ? kFast :
             kCubicBytes,
           kNack),
       version_negotiation_state_(START_NEGOTIATION),

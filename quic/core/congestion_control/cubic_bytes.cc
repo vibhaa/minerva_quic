@@ -77,7 +77,10 @@ float CubicBytes::Beta() const {
   // TCP-Reno connections on a single loss event. The effective multiplier is
   // computed as:
   //return (num_connections_ - 1 + kBeta) / num_connections_;
-  return (weight_ - 1 + kBeta) / weight_;
+  //return (weight_ - 1 + kBeta) / weight_;
+  //return (3 * weight_ - 1) / (3*weight_ + 1);
+  // Derive the following from setting (1 + b')/(1-b') = m(1+b)/(1-b)
+  return (kBeta*(weight_ + 1) + weight_ - 1)/(kBeta*(weight_ - 1) + weight_ + 1);
 }
 
 float CubicBytes::BetaLastMax() const {

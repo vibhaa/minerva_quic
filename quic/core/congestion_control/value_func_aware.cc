@@ -9,6 +9,8 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
+#include <math.h>
+#include <stdlib.h>
 
 #include "net/quic/core/congestion_control/prr_sender.h"
 #include "net/quic/core/congestion_control/rtt_stats.h"
@@ -29,6 +31,8 @@ namespace {
 // fast retransmission.
 const QuicByteCount kDefaultMinimumCongestionWindow = 2 * kDefaultTCPMSS;
 }  // namespace
+
+const float kLossEventWeights[] = {1, 1, 1, 1, 0.8, 0.6, 0.4, 0.2};
 
 ValueFuncAware::ValueFuncAware(
     const QuicClock* clock,
@@ -53,6 +57,7 @@ ValueFuncAware::ValueFuncAware(
       last_time_(QuicWallTime::Zero()),
       multiplier_(1.0),
       rate_ewma_(-1),
+      rate_inst_(0),
       last_weight_update_time_(clock->WallNow()),
       rate_measurement_interval_(QuicTime::Delta::FromMilliseconds(1000)),
       weight_update_horizon_(QuicTime::Delta::FromMilliseconds(1000)),
@@ -62,12 +67,14 @@ ValueFuncAware::ValueFuncAware(
       max_weight_(5.0),
       value_(0.0),
       adjusted_value_(0.0),
-      cubic_utility_fn_(10, std::vector<double>(2)) {
+      cubic_utility_fn_(10, std::vector<double>(2)),
+      loss_event_intervals_(1, 0),
+      in_ebcc_mode_(false),
+      last_loss_event_time_(QuicWallTime::Zero()) {
           ReadArgs();
           if (transport_ == transFast) {
               rate_measurement_interval_ = QuicTime::Delta::FromMilliseconds(250);
           }
-          InitCubicInverseFn();
       }
 
 ValueFuncAware::~ValueFuncAware() {
@@ -178,6 +185,7 @@ void ValueFuncAware::UpdateWithAck(QuicByteCount acked_bytes) {
         bool record = client_data_->record_acked_bytes(acked_bytes);
         new_rate_update_ = new_rate_update_ || record;
     }
+    loss_event_intervals_[loss_event_intervals_.size()-1]++;
 }
 
 void ValueFuncAware::OnPacketLost(QuicPacketNumber packet_number,
@@ -200,6 +208,16 @@ void ValueFuncAware::OnPacketLost(QuicPacketNumber packet_number,
                   << " because it was sent prior to the last CWND cutback.";
     return;
   }
+  // Since a loss event was detected, create a new loss interval.
+  if (client_data_ != nullptr) {
+      DLOG(INFO) << "Parse: screensize " << client_data_->get_screen_size() << " loss interval " << loss_event_intervals_[loss_event_intervals_.size() - 1];
+  }
+  loss_event_intervals_.push_back(0);
+  if (loss_event_intervals_.size() > sizeof(kLossEventWeights)/sizeof(float) && transport_ == transEBCC) {
+      in_ebcc_mode_ = true;
+  }
+  last_loss_event_time_ = clock_->WallNow();
+  
   ++stats_->tcp_loss_events;
   last_cutback_exited_slowstart_ = InSlowStart();
   if (InSlowStart()) {
@@ -220,6 +238,8 @@ void ValueFuncAware::OnPacketLost(QuicPacketNumber packet_number,
   } else if (transport_ == transReno) {
       float beta = RenoBeta();
       congestion_window_ = congestion_window_ * beta ;
+  } else if (in_ebcc_mode_) {
+    congestion_window_ = GetCwndEBCC();
   } else {
     congestion_window_ =
         cubic_.CongestionWindowAfterPacketLoss(congestion_window_);
@@ -244,140 +264,6 @@ QuicByteCount ValueFuncAware::GetSlowStartThreshold() const {
   return slowstart_threshold_;
 }
 
-double ValueFuncAware::AverageExpectedQoe(QuicBandwidth rate) {
-    QuicByteCount cs = client_data_->get_chunk_remainder();
-    double buf = client_data_->get_buffer_estimate();
-    // Adjust the buffer for dash.
-    buf -= 0.6;
-    double rebuf_time = 100.0;
-    if (rate.ToBytesPerSecond() > 0) { 
-        buf -= ((double)cs)/rate.ToBytesPerSecond();
-        if (buf < 0) {
-            rebuf_time = -buf;
-        } else {
-            rebuf_time = 0.0;
-        }
-    }
-    DLOG(INFO) << "Chunk remainder (bytes) = " << cs
-        << ", buffer = " << buf
-        << ", ss = " << client_data_->get_screen_size()
-        << ", chunk_ix = " << client_data_->get_chunk_index()
-        << ", rate estimate = " << rate.ToKBitsPerSecond();
-    DLOG(INFO) << "current bitrate " << client_data_->current_bitrate()
-        << ", prev bitrate " << client_data_->prev_bitrate();
-    double cur_qoe = client_data_->qoe(client_data_->current_bitrate(), rebuf_time,
-        client_data_->prev_bitrate());
-    buf = fmax(0.0, buf) + 4.0;
-    double value = client_data_->get_value_func()->ValueFor(
-            buf, ((double)rate.ToBitsPerSecond())/(1000.0 * 1000.0),
-            client_data_->current_bitrate());
-    double past_qoe_weight = fmin(10, client_data_->get_chunk_index());
-    double cur_chunk_weight = 1.0;
-    double value_weight = client_data_->get_value_func()->Horizon();
-    double avg_est_qoe = value * value_weight / client_data_->get_value_func()->Horizon();
-    double total_weight = value_weight;
-    avg_est_qoe += cur_qoe * cur_chunk_weight;
-    total_weight += cur_chunk_weight;
-    if (client_data_->get_chunk_index() > (int)past_qoe_weight) {
-        avg_est_qoe += (client_data_->get_past_qoe()) * past_qoe_weight/(client_data_->get_chunk_index());
-        total_weight += past_qoe_weight;
-    } else {
-        avg_est_qoe += 10 * (past_qoe_weight - client_data_->get_chunk_index()) + client_data_->get_past_qoe();
-        total_weight += past_qoe_weight;
-    }
-    avg_est_qoe /= total_weight;
-    value_ = avg_est_qoe;
-    //double avg_est_qoe = (client_data_->get_past_qoe() + cur_qoe + value) /
-    //    (client_data_->get_chunk_index() + 1 + client_data_->get_value_func()->Horizon());
-    DLOG(INFO) << "Past qoe = " << client_data_->get_past_qoe()
-        << ", cur chunk qoe = " << cur_qoe
-        << ", value = " << value_
-        << ", ss = " << client_data_->get_screen_size()
-        << ", avg est qoe = " << avg_est_qoe; 
-    return avg_est_qoe;
-}
-
-// Given a function f, specified as a table, computes f^{-1}(val).
-double ValueFuncAware::GeneralFuncInverse(const vector<vector<double>>& table, double val) {
-    // The function is monotonically increasing, so search for the value in the table.
-    size_t upper_ix = 0;
-    for (size_t i = 0; i < table.size(); i++) {
-        if (val < table[i][1]) {
-            break;
-        }
-        upper_ix = i+1;
-    }
-    // Interpolate if necessary:
-    if (upper_ix == 0) {
-        return val * table[0][0] / table[0][1];
-    }
-    if (upper_ix == table.size()) {
-        return table[upper_ix-1][0];
-    }
-    double frac = (val - table[upper_ix-1][1])/(table[upper_ix][1] - table[upper_ix-1][1]);
-    return frac*table[upper_ix][0] + (1-frac)*table[upper_ix-1][0];
-}
-
-void ValueFuncAware::InitCubicInverseFn() {
-    // Hard code this for now for testing.
-    vector<vector<double>> vmaf1 {{0.375, 14.214970591},
-                                  {1.05, 37.8881577018},
-                                  {1.75, 49.4193675888},
-                                  {2.35, 59.3426629332},
-                                  {3.05, 66.3851950796},
-                                  {4.3, 77.019566865},
-                                  {5.8, 85.1433782961},
-                                  {7.5, 91.1899283228},
-                                  {15.0, 99.281165376},
-                                  {20.0, 99.8326275398}};
-    vector<vector<double>> vmaf2 {{0.375, 52.1474829247},
-                                  {0.75, 69.5570590818},
-                                  {1.05, 78.4550621593},
-                                  {1.75, 84.8456620831},
-                                  {3.05, 92.7166629274},
-                                  {4.3, 97.2253602622}};
-    vector<vector<double>> combined {{14.214970591, 0.0},
-                                     {37.8881577018, 0.0},
-                                     {49.4193675888, 0.0},
-                                     {52.1474829247, 0.0},
-                                     {59.3426629332, 0.0},
-                                     {66.3851950796, 0.0},
-                                     {69.5570590818, 0.0},
-                                     {77.019566865, 0.0},
-                                     {78.4550621593, 0.0},
-                                     {84.8456620831, 0.0},
-                                     {85.1433782961, 0.0},
-                                     {91.1899283228, 0.0},
-                                     {92.7166629274, 0.0},
-                                     {97.2253602622, 0.0},
-                                     {99.8326275398, 0.0}};
-    for (size_t i = 0; i < combined.size(); i++) {
-        double val = GeneralFuncInverse(vmaf1, combined[i][0]) +
-            GeneralFuncInverse(vmaf2, combined[i][0]);
-        combined[i][1] = val;
-        DLOG(INFO) << "Combined (U1-1 + U2-1 fn " << i << ": " << combined[i][0] << ", " << val;
-    }
-
-    vector<double> rates = {0.375, 0.75, 1.05, 1.75, 2.35, 3.05, 4.3, 5.8, 7.5, 15.0};
-    // At this point we have: combined(x) = (U_1^{-1}(x) + U_2^{-1}(x)).
-    // Now we need f^{-1}(x) = combined^{-1}(2x)
-    for (size_t i = 0; i < cubic_utility_fn_.size(); i++) {
-        cubic_utility_fn_[i][0] = rates[i];
-        double val = GeneralFuncInverse(combined, 2*rates[i]) / 5;
-        cubic_utility_fn_[i][1] = val;
-        DLOG(INFO) << " Cubic utility fn " << i << ": " << rates[i] << ", " << val ;
-    }
-}
-
-// In order to make sure that the weights all average to some constant (since they're used
-// to emulate that many cubic flows), we want to compose some function f with the utility:
-// w = r/f(U(r)). It turns out that this function can be defined by its inverse:
-// f^{-1}(x) = [\sum_i U_i^{-1}](nx) if there are n clients. f^{-1} can be viewed as the
-// utility function for a Cubic flow.
-double ValueFuncAware::ComputeCubicInverse(double arg) {
-    return GeneralFuncInverse(cubic_utility_fn_, arg) / 2;    
-}
-
 void ValueFuncAware::UpdateCwndMultiplier() {
     // DLOG(INFO) << "Updating congestion window " << congestion_window_;
     if (client_data_ == nullptr) {
@@ -386,34 +272,35 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     if (!new_rate_update_) {
         return;
     }
-    new_rate_update_ = false;
-    if (client_data_->get_num_bw_estimates() < 10) {
+    if (client_data_->get_chunk_index() < 1) {
         return;
     }
+    new_rate_update_ = false;
     QuicBandwidth real_rate = client_data_->get_latest_rate_estimate();
     QuicBandwidth rate = client_data_->get_conservative_rate_estimate();
     DLOG(INFO) << "Conservative rate estimate " << rate << ", real rate " << real_rate << ", ratio = "
         << ((double)rate.ToBitsPerSecond()) / real_rate.ToBitsPerSecond();
-    double rate_ewma_factor = 0.1;
+    double rate_ewma_factor = 0.2;
     if (rate_ewma_ < 0) {
         rate_ewma_ = rate.ToBitsPerSecond();
     }
-    rate_ewma_ = (int64_t)(rate_ewma_factor * rate.ToBitsPerSecond() + (1 - rate_ewma_factor) * rate_ewma_);
+    rate_inst_ = real_rate.ToBitsPerSecond();
+    rate_ewma_ = (int64_t)(rate_ewma_factor * real_rate.ToBitsPerSecond() + (1 - rate_ewma_factor) * rate_ewma_);
     rate = QuicBandwidth::FromBitsPerSecond(rate_ewma_);
-    
+   
     double utility;
     double adjusted_utility;
     bool prop_fairness = (client_data_->opt_target() == ClientData::OptTarget::propfair); // EXPERIMENTAL!
+    bool needs_deriv = (client_data_->opt_target() == ClientData::OptTarget::propfair ||
+            client_data_->opt_target() == ClientData::OptTarget::sum);
     DLOG(INFO) << "Optimization target is prop fairness? " << prop_fairness;
 
-    if (!prop_fairness) {
+    if (!needs_deriv) {
         utility = client_data_->average_expected_qoe(rate);
-        value_ = utility;
         if (utility > 30) {
             adjusted_utility = 30.0;
         }
         adjusted_utility = log(1 + exp(utility));
-        //adjusted_utility = 10.0/(1 + exp((10.0-utility)/4.0));
     }
     else {
         QuicBandwidth rate_m1 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() - 100000);
@@ -426,12 +313,12 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         //QuicBandwidth rate_p3 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() + 300000);
         //QuicBandwidth rate_p4 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() + 400000);
         //QuicBandwidth rate_p5 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() + 500000);
-        double q_p1 = AverageExpectedQoe(rate_p1);
+        double q_p1 = client_data_->average_expected_qoe(rate_p1);
         //double q_p2 = AverageExpectedQoe(rate_p2);
         //double q_p3 = AverageExpectedQoe(rate_p3);
         //double q_p4 = AverageExpectedQoe(rate_p4);
         //double q_p5 = AverageExpectedQoe(rate_p5);
-        double q_m1 = AverageExpectedQoe(rate_m1);
+        double q_m1 = client_data_->average_expected_qoe(rate_m1);
         //double q_m2 = AverageExpectedQoe(rate_m2);
         //double q_m3 = AverageExpectedQoe(rate_m3);
         //double q_m4 = AverageExpectedQoe(rate_m4);
@@ -443,44 +330,41 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         //double d_utility5 = (q_p5 - q_m5)/1.0;
         double d_utility = d_utility1; //(d_utility1 + d_utility2 + d_utility3 + d_utility4 + d_utility5) / 4;
         DLOG(INFO) << "Derivative is " << d_utility; 
-        utility = AverageExpectedQoe(rate)/d_utility;
-        if (utility > 30) {
-            adjusted_utility = 30;
+        float t = 10;
+        d_utility = 1/t * log(1 + exp(t*d_utility));
+        if (prop_fairness) {
+            utility = client_data_->average_expected_qoe(rate) / d_utility;
         } else {
-            // Softmax instead of sigmoid
-            adjusted_utility = log(1 + exp(utility));
+            utility = 1.0 / d_utility;
         }
-        //adjusted_utility = 10.0/(1 + exp((10.0-utility)/8.0));
+        adjusted_utility = fmin(utility, 30);
     }
+    value_ = utility;
 
     double target;
     if (adjusted_utility == 0) {
         adjusted_utility = 0.1;
     }
-    //adjusted_value_ = (adjusted_utility*adjusted_utility/20.0 + 1)/10.0;
-    adjusted_value_ = client_data_->compute_cubic_inverse(adjusted_utility);
+    //adjusted_value_ = adjusted_utility; //(adjusted_utility*adjusted_utility/20.0 + 1)/10.0;
+    adjusted_value_ = client_data_->normalize_utility(adjusted_utility);
     if (client_data_->get_chunk_index() >= 1) {
         // The Cubic inverse is in Mbps. Convert to Kbps.
         target = rate.ToKBitsPerSecond()/(1000.0 * (adjusted_value_));
     } else {
-
         target = 1;
-        //target = fmax(10, 8.0/client_data_->utility_for_bitrate(client_data_->current_bitrate()));
     }
     DLOG(INFO) << "Utility = " << utility
         << ", adjusted avg utility w/ sigmoid = " << adjusted_utility
         << ", value of utility = " << adjusted_value_
         << ", rate = " << rate.ToKBitsPerSecond()
         << ", target (packets) = " << target;
-    
-    /*QuicWallTime now = clock_->WallNow();
-    QuicTime::Delta time_elapsed = now.AbsoluteDifference(last_weight_update_time_);
-    last_weight_update_time_ = now;
-    double gamma = exp(-time_elapsed.ToMicroseconds()/((double)weight_update_horizon_.ToMicroseconds()));
-    DLOG(INFO) << "Updated weight after " << time_elapsed << " and ewma weight " << gamma;
-    multiplier_ = (1 - gamma) * target + gamma * multiplier_;*/
-    // SET FOR IMMEDIATE WEIGHT.
-    float mult_ewma = 0.2;
+   
+    // Correction to deal with cubic not respecting ratios well
+    // Another possibility to try is to inflate the measured rate but normalize with the real one?.
+    target = 0.83 * target;
+    DLOG(INFO) << "Adjusted target = " << target;
+
+    float mult_ewma = 0.3;
     multiplier_ = mult_ewma * target + (1 - mult_ewma) * multiplier_;
     if (max_weight_ > 0) {
         multiplier_ = fmax(fmin(multiplier_, 5.0), 1.0);
@@ -495,20 +379,54 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     // UNCOMMENT BELOW TO SET MAX WEIGHT.
     //multiplier_ = fmax(fmin(multiplier_, max_weight_), 1);
     SetWeight(multiplier_);
-    if (transport_ == transFast) {
-        UpdateCwndFastTCP();
-    }
+}
 
+float ValueFuncAware::LossProbability() {
+    if (loss_event_intervals_.size() <= sizeof(kLossEventWeights)/sizeof(float)) {
+        DLOG(INFO) << "Calling LossProbability() without enough samples";
+        return 0;
+    }
+    float weighted_loss_interval = 0.0;
+    float weighted_loss_interval2 = 0.0;
+    float total_weight = 0;
+    string loss_str = to_string(loss_event_intervals_[loss_event_intervals_.size() - 1]);
+    for (size_t i = 0; i < sizeof(kLossEventWeights)/sizeof(float); i++) {
+        // Don't count the last loss interval because it's still developing.
+        weighted_loss_interval += kLossEventWeights[i] * loss_event_intervals_[loss_event_intervals_.size() - 2 - i];
+        weighted_loss_interval2 += kLossEventWeights[i] * loss_event_intervals_[loss_event_intervals_.size() - 1 - i];
+        total_weight += kLossEventWeights[i];
+        loss_str += ", " + to_string(loss_event_intervals_[loss_event_intervals_.size() - 2 - i]);
+    }
+    float all_intervals = 0;
+    for (size_t i = 0; i < loss_event_intervals_.size(); i++) {
+        all_intervals += loss_event_intervals_[i];
+    }
+    DLOG(INFO) << "Loss event intervals: " << loss_str << ", all time avg loss " << all_intervals / loss_event_intervals_.size();
+    return total_weight / max(weighted_loss_interval, weighted_loss_interval2);
+}
+
+// Sets the congestion window to be at the rate that represents the average congestion window, as a function of the loss event probability.
+// The loss probability is determined by looking at the history of loss events and counting the packets between them.
+unsigned long ValueFuncAware::GetCwndEBCC() {
+    // This is kCubeConvestionWindowScale / 1024, from cubic.cc
+    float cubic_const = 0.4;
+    float cubic_beta = 1 - 0.7;
+    float p = LossProbability();
+    float rtt = rtt_stats_->smoothed_rtt().ToMilliseconds() / 1000.0;
+    float new_cwnd = pow(cubic_const * (4 - cubic_beta)/(4*cubic_beta), 0.25) * pow(rtt/p, 0.75);
+    DLOG(INFO) << "EBCC measures RTT " << rtt << ", loss probability " << p << ", and CWND " << new_cwnd * multiplier_ << ", actual cwnd = " << congestion_window_ / kDefaultTCPMSS;
+    return (unsigned long)(new_cwnd * multiplier_ * kDefaultTCPMSS);
 }
 
 void ValueFuncAware::UpdateCwndFastTCP() {
     // If we're aiming for an average of 2 cubic flows per video flow, there will be 20 packets in the queue per flow on average.
-    double target = 10 * weight_;
+    double target = 5 * weight_;
     double gamma = 0.8;
     double minrtt = rtt_stats_->min_rtt().ToMilliseconds();
     double new_wnd = (minrtt / rtt_stats_->latest_rtt().ToMilliseconds()) * congestion_window_ +
        target * kDefaultTCPMSS; 
     congestion_window_ = (int)((1 - gamma) * congestion_window_ + gamma * new_wnd);
+    DLOG(INFO) << "FAST target is " << target << " with min_rtt = " << minrtt << "ms, latest rtt = " << rtt_stats_->latest_rtt().ToMilliseconds();
     DLOG(INFO) << "Updating congestion window for ss " << client_data_->get_screen_size() << " window " << congestion_window_;
 }
 
@@ -527,11 +445,13 @@ void ValueFuncAware::MaybeIncreaseCwnd(
     QuicTime event_time) {
 
   UpdateCwndMultiplier();
+  //int ebcc_cwnd = GetCwndEBCC();
+  //DLOG(INFO) << "EBCC cwnd is " << ebcc_cwnd;
   // Adjust the CWND multiplier as needed. Works better on Reno than 
   if (client_data_ != nullptr) {
       client_data_->set_bw_measurement_interval(rate_measurement_interval_);
       if (!bw_log_file_.is_open()) {
-          std::string filename = "quic_bw_vf_" + std::to_string(client_data_->get_client_id()) + ".log";
+          std::string filename = "quic_bw_vf_fast_" + std::to_string(client_data_->get_client_id()) + ".log";
           bw_log_file_.open(filename, std::ios::trunc);
       }
       double ss = client_data_->get_screen_size();
@@ -554,6 +474,7 @@ void ValueFuncAware::MaybeIncreaseCwnd(
                      << ", \"adjusted_value\": " << adjusted_value_
                      << ", \"rate_ewma\": " << rate_ewma_ / 1000000.0
                      << ", \"past_qoe\": " << client_data_->get_past_qoe()
+                     << ", \"rate_inst\": " << rate_inst_ / 1000000.0
                      << "}\n";
       }
   }
@@ -584,14 +505,8 @@ void ValueFuncAware::MaybeIncreaseCwnd(
    ++num_acked_packets_;
   // Congestion avoidance.
   if (transport_ == transFast) {
+      UpdateCwndFastTCP();
       return;
-     /*// Update cwnd once every RTT, like for reno
-     // TODO(vikram): what if we do this on every ack? Too much?
-     if (num_acked_packets_ * num_connections_ >=
-          congestion_window_ / kDefaultTCPMSS) {
-        UpdateCwndFastTCP();
-        num_acked_packets_ = 0;
-     }*/
   } else if (transport_ == transReno) {
     // Classic Reno congestion avoidance.
     // Divide by num_connections to smoothly increase the CWND at a faster rate
@@ -605,6 +520,9 @@ void ValueFuncAware::MaybeIncreaseCwnd(
     QUIC_DVLOG(1) << "Reno; congestion window: " << congestion_window_
                   << " slowstart threshold: " << slowstart_threshold_
                   << " congestion window count: " << num_acked_packets_;
+  } else if (transport_ == transEBCC && in_ebcc_mode_) {
+     // We should pace this.
+     congestion_window_ = std::min(max_congestion_window_, GetCwndEBCC());
   } else {
     congestion_window_ = std::min(
         max_congestion_window_,

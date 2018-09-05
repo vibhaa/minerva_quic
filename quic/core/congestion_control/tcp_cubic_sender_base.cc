@@ -115,7 +115,8 @@ float TcpCubicSenderBase::RenoBeta() const {
   // TCP-Reno connections on a single loss event. The effective multiplier is
   // computed as:
   //return (num_connections_ - 1 + kRenoBeta) / num_connections_;
-  return (weight_ - 1 + kRenoBeta) / weight_;
+  //return (weight_ - 1 + kRenoBeta) / weight_;
+  return (kRenoBeta*(weight_ + 1) + weight_ - 1)/(kRenoBeta*(weight_ - 1) + weight_ + 1);
 }
 
 void TcpCubicSenderBase::OnCongestionEvent(
@@ -130,13 +131,13 @@ void TcpCubicSenderBase::OnCongestionEvent(
           GetCongestionWindow() / kDefaultTCPMSS)) {
     ExitSlowstart();
   }
-  for (const LostPacket& lost_packet : lost_packets) {
-    OnPacketLost(lost_packet.packet_number, lost_packet.bytes_lost,
-                 prior_in_flight);
-  }
   for (const AckedPacket acked_packet : acked_packets) {
     OnPacketAcked(acked_packet.packet_number, acked_packet.bytes_acked,
                   prior_in_flight, event_time);
+  }
+  for (const LostPacket& lost_packet : lost_packets) {
+    OnPacketLost(lost_packet.packet_number, lost_packet.bytes_lost,
+                 prior_in_flight);
   }
 }
 

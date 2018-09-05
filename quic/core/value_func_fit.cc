@@ -34,16 +34,28 @@ ValueFuncFit::ValueFuncFit(const string& filename)
 ValueFuncFit::~ValueFuncFit() {}
 
 double ValueFuncFit::ValueFor(double buffer, double rate, int prev_bitrate) {
-    double rate_delta_ = rates_[1] - rates_[0];
-    size_t rate_ix = (size_t)((rate - rates_[0]) / rate_delta_);
-    rate_ix = max((size_t)0, min(rate_ix, rates_.size() - 1)); 
+    size_t rate_ix = 0;
+    size_t upper_rate_ix = 0;
+    if (rate > rates_[0]) {
+        double rate_delta_ = rates_[1] - rates_[0];
+        rate_ix = (size_t)((rate - rates_[0]) / rate_delta_);
+        rate_ix = max((size_t)0, min(rate_ix, rates_.size() - 1)); 
+        upper_rate_ix = min(rates_.size() - 1, rate_ix + 1); 
+    }
     int br_ix = br_inverse_[prev_bitrate];
-    vector<double> params = values_[rate_ix][br_ix];
+    vector<double> params = values_[upper_rate_ix][br_ix];
     // The params are the a,b,c for: a - b*exp(-cx)
-    double value = params[0] - params[1] * exp(params[2]*buffer);
-    //double maxbuf = 19.99;
-    //double maxval = params[0] * maxbuf * maxbuf + params[1] * maxbuf + params[2];
-    //value = 2 * maxval * buffer / maxbuf - value;
+    double value_up = params[0] - params[1] * exp(params[2]*buffer);
+    params = values_[rate_ix][br_ix];
+    double value_down = params[0] - params[1] * exp(params[2]*buffer);
+    double rate_frac = 1;
+    if (upper_rate_ix > rate_ix) {
+        rate_frac = (rate - rates_[rate_ix])/(rates_[upper_rate_ix] - rates_[rate_ix]);
+    }
+
+    // Interpolate over the two rate options.
+    double value = value_up * rate_frac + (1 - rate_frac) * value_down;
+    
     DLOG(INFO) << "Params buffer=" << buffer << ", rate=" << rate
         << ", prev_bitrate=" << prev_bitrate << ", br_ix=" << br_ix
         << ", rate_ix=" << rate_ix << ", value=" << value;    

@@ -13,6 +13,7 @@
 #include "net/quic/core/quic_time.h"
 #include "net/quic/platform/api/quic_clock.h"
 #include "net/quic/platform/api/quic_export.h"
+#include "net/quic/core/function_table.h"
 #include "net/quic/core/quic_time.h"
 #include "net/quic/core/video.h"
 #include "net/quic/core/value_func.h"
@@ -27,7 +28,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   ~ClientData();
 
   enum VfType {interp, fit, raw};
-  enum OptTarget {maxmin, propfair};
+  enum OptTarget {maxmin, propfair, sum};
   
   void new_chunk(int bitrate, QuicByteCount chunk_size);
   void reset_chunk_remainder(QuicByteCount x);
@@ -81,7 +82,8 @@ class QUIC_EXPORT_PRIVATE ClientData {
   double average_expected_qoe(QuicBandwidth cur_rate);
   double generic_fn_inverse(const std::vector<std::vector<double>>& table, double arg);
   void init_cubic_inverse();
-  double compute_cubic_inverse(double arg);
+  float normalize_utility(float arg);
+  //double compute_cubic_inverse(double arg);
 
  private:
   void reset_bw_measurement();
@@ -92,7 +94,9 @@ class QUIC_EXPORT_PRIVATE ClientData {
   int chunk_index_;
   const QuicClock* clock_;
   // Sum of the QoE for all chunks downloaded so far.
-  double past_qoe_;
+  double last_qoe_update_;
+  std::vector<double>* past_qoes_;
+  int past_qoe_chunks_;
   // This *can* go negative, so we explicitly use an int64.
   int64_t chunk_remainder_;
   // TODO(vikram,arc): this needs to be filled in at initialization.
@@ -114,7 +118,13 @@ class QUIC_EXPORT_PRIVATE ClientData {
   std::string vid_prefix_;
   VfType vf_type_;
   OptTarget opt_target_;
+
   std::vector<std::vector<double>> cubic_utility_fn_;
+  // If we're optimizing for max-min fairness, this is the `inverse function' we use
+  // so that the average multiplier is equal to TCP's multiplier when in the steady state.  
+  FunctionTable maxmin_util_inverse_fn_;
+  // Likewise, but if we're using sum of QoEs as the metric.
+  FunctionTable sum_util_inverse_fn_;
 };
 
 }  // namespace net

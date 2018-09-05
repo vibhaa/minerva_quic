@@ -223,6 +223,7 @@ void QuicSimpleServer::SetCongestionControlType(enum CongestionControlType cc_ty
     SetQuicFlag(&FLAGS_quic_default_to_vmaf_cubic, false);  
     SetQuicFlag(&FLAGS_quic_default_to_vmaf_reno, false); 
     SetQuicFlag(&FLAGS_quic_default_to_vmaf_fast, false);
+    SetQuicFlag(&FLAGS_quic_default_to_tcp_fast, false);
     SetQuicFlag(&FLAGS_quic_default_to_propss_cubic, false);
     SetQuicFlag(&FLAGS_quic_default_to_propss_fast, false);
 
@@ -256,6 +257,10 @@ void QuicSimpleServer::SetCongestionControlType(enum CongestionControlType cc_ty
             break;
         case net::kVMAFAwareFast:
             SetQuicFlag(&FLAGS_quic_default_to_vmaf_fast, true);
+            break;
+        case net::kFast:
+            DLOG(INFO) << "Setting cc type to Tcp FAST in quic_simple_server";
+            SetQuicFlag(&FLAGS_quic_default_to_tcp_fast, true);
             break;
         case net::kPropSSCubic:
             SetQuicFlag(&FLAGS_quic_default_to_propss_cubic, true);

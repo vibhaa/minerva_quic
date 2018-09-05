@@ -46,13 +46,7 @@ size_t ValueFuncInterp::FindBinarySearch(vector<double> values, size_t min_ix, s
     }
 }
 
-double ValueFuncInterp::ValueFor(double buffer, double rate, int prev_bitrate) {
-    double rate_delta_ = rates_[1] - rates_[0];
-    size_t rate_ix = (size_t)((rate - rates_[0]) / rate_delta_);
-    rate_ix = max((size_t)0, min(rate_ix, rates_.size() - 1)); 
-    int br_ix = br_inverse_[prev_bitrate];
-    vector<vector<double>> params = values_[rate_ix][br_ix];
-
+double ValueFuncInterp::ValueForParams(double buffer, const vector<vector<double>>& params) {
     DLOG(INFO) << "Binary search on size " << params[0].size();
     double maxbuf = 19.99;
     double maxval = params[1][params[1].size() - 1];
@@ -78,6 +72,30 @@ double ValueFuncInterp::ValueFor(double buffer, double rate, int prev_bitrate) {
             value = params[1][ix] * (1 - proportion) + params[1][ix+1] * proportion;
         }
     }
+    return value;
+}
+
+double ValueFuncInterp::ValueFor(double buffer, double rate, int prev_bitrate) {
+    size_t rate_ix = 0;
+    size_t upper_rate_ix = 0;
+    if (rate > rates_[0]) {
+        double rate_delta_ = rates_[1] - rates_[0];
+        rate_ix = (size_t)((rate - rates_[0]) / rate_delta_);
+        rate_ix = max((size_t)0, min(rate_ix, rates_.size() - 1)); 
+        upper_rate_ix = min(rates_.size() - 1, rate_ix + 1);
+    }
+    int br_ix = br_inverse_[prev_bitrate];
+    vector<vector<double>> params = values_[rate_ix][br_ix];
+    double value = ValueForParams(buffer, params);
+    
+    // Interpolate between different rates.
+    if (upper_rate_ix > rate_ix) {
+        params = values_[upper_rate_ix][br_ix];
+        double value_down = ValueForParams(buffer, params);
+        double rate_frac = (rate - rates_[rate_ix])/(rates_[upper_rate_ix] - rates_[rate_ix]);
+        value = value * rate_frac + (1 - rate_frac) * value_down;
+    }
+
     DLOG(INFO) << "Params buffer=" << buffer << ", rate=" << rate
         << ", prev_bitrate=" << prev_bitrate << ", br_ix=" << br_ix
         << ", rate_ix=" << rate_ix << ", value=" << value;    

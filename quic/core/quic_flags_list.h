@@ -128,6 +128,9 @@ QUIC_FLAG(bool, FLAGS_quic_default_to_vf_reno, false)
 // When true, defaults to ValueFuncFastTCP instead of Cubic.
 QUIC_FLAG(bool, FLAGS_quic_default_to_vf_fast, false)
 
+// When true, defaults to FastTCP.
+QUIC_FLAG(bool, FLAGS_quic_default_to_tcp_fast, false)
+
 // When true, defaults to BBR congestion control instead of Cubic.
 QUIC_FLAG(bool, FLAGS_quic_reloadable_flag_quic_default_to_bbr, false)
 

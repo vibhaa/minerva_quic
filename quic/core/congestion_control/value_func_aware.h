@@ -51,9 +51,9 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
   QuicByteCount GetSlowStartThreshold() const override;
   CongestionControlType GetCongestionControlType() const override;
   // End implementation of SendAlgorithmInterface.
-  double AverageExpectedQoe(QuicBandwidth rate);
   void UpdateCwndMultiplier();
   void UpdateCwndFastTCP();
+  unsigned long GetCwndEBCC();
   void SetWeight(float weight);
   QuicByteCount min_congestion_window() const { return min_congestion_window_; }
 
@@ -78,9 +78,7 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
 
   bool isOption(std::string s);
   double ReadMaxWeight();
-  void InitCubicInverseFn();
-  double GeneralFuncInverse(const std::vector<std::vector<double>>& table, double arg);
-  double ComputeCubicInverse(double arg);
+  float LossProbability();
 
  private:
   friend class test::ValueFuncAwarePeer;
@@ -123,6 +121,7 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
   double multiplier_;
 
   int64_t rate_ewma_;
+  int64_t rate_inst_;
 
   QuicWallTime last_weight_update_time_;
 
@@ -153,6 +152,12 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
   std::vector<std::string> read_options;
 
   std::vector<std::vector<double>> cubic_utility_fn_;
+
+  std::vector<int> loss_event_intervals_;
+  // Triggered when there are sufficiently many loss events that we can make an accurate estimate.
+  bool in_ebcc_mode_;
+  QuicWallTime last_loss_event_time_;
+
   DISALLOW_COPY_AND_ASSIGN(ValueFuncAware);
 
 };

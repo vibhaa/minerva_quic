@@ -129,6 +129,8 @@ int main(int argc, char* argv[]) {
       server.SetCongestionControlType(net::kPropSSFast);
   } else if (cc_type == "PropSSCubic") {
       server.SetCongestionControlType(net::kPropSSCubic);
+  } else if (cc_type == "fast") {
+      server.SetCongestionControlType(net::kFast);
   } else if (cc_type == "cubic") {
       server.SetCongestionControlType(net::kCubicBytes);
   } else if (cc_type  == "reno") {

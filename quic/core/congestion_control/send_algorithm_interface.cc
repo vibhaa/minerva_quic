@@ -11,7 +11,8 @@
 #include "net/quic/core/congestion_control/vmaf_aware.h"
 #include "net/quic/core/congestion_control/prop_ss_fast_tcp.h"
 #include "net/quic/core/congestion_control/value_func_aware.h"
-//#include "net/quic/core/congestion_control/num_sender.h"
+#include "net/quic/core/congestion_control/fast_tcp.h"
+#include "net/quic/core/congestion_control/pacing_sender.h"
 #include "net/quic/core/client_data.h"
 #include "net/quic/core/quic_packets.h"
 #include "net/quic/platform/api/quic_bug_tracker.h"
@@ -113,6 +114,10 @@ SendAlgorithmInterface* SendAlgorithmInterface::Create(
       return new ValueFuncAware(
               clock, rtt_stats, initial_congestion_window,
               max_congestion_window, stats, transCubic);
+    case kFast:
+      DLOG(INFO) << "Congestion control type is FAST";
+      return new FastTCP(clock, rtt_stats, initial_congestion_window,
+              max_congestion_window, stats, transFast);
     case kValueFuncFast:
       DLOG(INFO) << "Congestion control type is ValueFuncAware over fastTCP";
       return new ValueFuncAware(

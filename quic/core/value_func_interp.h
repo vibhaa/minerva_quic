@@ -31,6 +31,7 @@ class QUIC_EXPORT_PRIVATE ValueFuncInterp : public ValueFunc {
   string ArrToString(vector<double> arr) override;
 
  private:
+  double ValueForParams(double buffer, const std::vector<std::vector<double>>& params);
   size_t FindBinarySearch(vector<double> values, size_t min_ix, size_t max_ix, double query);
   void ParseFrom(const string& filename);
   vector<double> ParseArray(ifstream *file);

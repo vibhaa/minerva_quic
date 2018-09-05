@@ -212,9 +212,9 @@ enum QuicPacketPrivateFlags {
 enum CongestionControlType { kCubicBytes, kRenoBytes, kBBR, kPCC,
     kPropSS, kPropSSCubic, kMaxPropRisk, kMPRCubic, kPropSSBBR,
     kVMAFAwareFast, kVMAFAwareCubic, kVMAFAwareReno, 
-    kPropSSFast, kNUM, kValueFuncCubic, kValueFuncFast, kValueFuncReno };
+    kPropSSFast, kNUM, kValueFuncCubic, kFast, kValueFuncFast, kValueFuncReno };
 
-enum TransportType { transFast, transCubic, transReno};
+enum TransportType { transFast, transCubic, transReno, transEBCC};
 
 enum LossDetectionType {
   kNack,          // Used to mimic TCP's loss detection.

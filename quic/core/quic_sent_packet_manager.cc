@@ -78,13 +78,14 @@ QuicSentPacketManager::QuicSentPacketManager(
       pending_timer_transmission_count_(0),
       max_tail_loss_probes_(kDefaultMaxTailLossProbes),
       enable_half_rtt_tail_loss_probe_(false),
-      using_pacing_(false),
+      using_pacing_(true),
       use_new_rto_(false),
       conservative_handshake_retransmits_(false),
       largest_newly_acked_(0),
       largest_mtu_acked_(0),
       handshake_confirmed_(false),
       largest_packet_peer_knows_is_acked_(0) {
+  DLOG(INFO) << "Setting congestion control type " << congestion_control_type;
   SetSendAlgorithm(congestion_control_type);
 }
 
@@ -114,13 +115,14 @@ void QuicSentPacketManager::SetFromConfig(const QuicConfig& config) {
              (FLAGS_quic_reloadable_flag_quic_default_to_bbr &&
               config.HasClientRequestedIndependentOption(kQBIC,
                                                          perspective_))) {
+    DLOG(INFO) << "Setting cubic from config";
     SetSendAlgorithm(kCubicBytes);
   } else if (FLAGS_quic_reloadable_flag_quic_enable_pcc &&
              config.HasClientRequestedIndependentOption(kTPCC, perspective_)) {
     SetSendAlgorithm(kPCC);
   }
 
-  using_pacing_ = !FLAGS_quic_disable_pacing_for_perf_tests;
+  //using_pacing_ = !FLAGS_quic_disable_pacing_for_perf_tests;
 
   if (config.HasClientSentConnectionOption(k1CON, perspective_)) {
     send_algorithm_->SetNumEmulatedConnections(1);
