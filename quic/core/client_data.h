@@ -72,6 +72,11 @@ class QUIC_EXPORT_PRIVATE ClientData {
   // TODO(vikram/arc): Use VMAF here.
   double utility_for_bitrate(int bitrate);
   double qoe(int bitrate, double rebuf_time, int prev_bitrate);
+  // Based on the average bitrate seen so far, returns an approximation to the derivative
+  // of the utility curve, at that average bitrate.
+  // Note that unlike qoe(), it is not dependent on the current buffer level, nor does it take
+  // into account smoothness penalties or rebuffering.
+  double qoe_deriv();
 
   // Returns the bitrate set by the most recent next_chunk(..) call.
   // If N/A, then returns 0.
@@ -95,19 +100,23 @@ class QUIC_EXPORT_PRIVATE ClientData {
   const QuicClock* clock_;
   // Sum of the QoE for all chunks downloaded so far.
   double last_qoe_update_;
-  std::vector<double>* past_qoes_;
+  std::vector<double> past_qoes_;
   int past_qoe_chunks_;
   // This *can* go negative, so we explicitly use an int64.
   int64_t chunk_remainder_;
   // TODO(vikram,arc): this needs to be filled in at initialization.
   double rebuf_penalty_;
   double smooth_penalty_;
+  // True if we're just biding our time, waiting for a full waiting interval before starting
+  // the bandwidth measurement;
+  bool waiting_;
 
   QuicWallTime start_time_;
   QuicWallTime last_measurement_start_time_;
   QuicByteCount bytes_since_last_measurement_;
   QuicWallTime last_record_time_;
   QuicWallTime last_buffer_update_time_;
+  QuicTime::Delta bw_waiting_interval_;
   QuicTime::Delta bw_measurement_interval_;
   std::vector<QuicBandwidth> bw_measurements_;
   Video vid_;

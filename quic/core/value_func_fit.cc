@@ -62,6 +62,7 @@ double ValueFuncFit::ValueFor(double buffer, double rate, int prev_bitrate) {
     return value;
 }
 
+
 int ValueFuncFit::Horizon() {
     return horizon_;
 }

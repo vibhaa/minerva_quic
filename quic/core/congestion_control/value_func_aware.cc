@@ -62,6 +62,7 @@ ValueFuncAware::ValueFuncAware(
       rate_measurement_interval_(QuicTime::Delta::FromMilliseconds(1000)),
       weight_update_horizon_(QuicTime::Delta::FromMilliseconds(1000)),
       start_time_(clock->WallNow()),
+      last_multiplier_update_(clock->WallNow()),
       transport_(transport),
       bw_log_file_(),
       max_weight_(5.0),
@@ -209,9 +210,6 @@ void ValueFuncAware::OnPacketLost(QuicPacketNumber packet_number,
     return;
   }
   // Since a loss event was detected, create a new loss interval.
-  if (client_data_ != nullptr) {
-      DLOG(INFO) << "Parse: screensize " << client_data_->get_screen_size() << " loss interval " << loss_event_intervals_[loss_event_intervals_.size() - 1];
-  }
   loss_event_intervals_.push_back(0);
   if (loss_event_intervals_.size() > sizeof(kLossEventWeights)/sizeof(float) && transport_ == transEBCC) {
       in_ebcc_mode_ = true;
@@ -273,21 +271,27 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         return;
     }
     if (client_data_->get_chunk_index() < 1) {
+        last_multiplier_update_ = clock_->WallNow();
         return;
     }
     new_rate_update_ = false;
+    /*
     QuicBandwidth real_rate = client_data_->get_latest_rate_estimate();
     QuicBandwidth rate = client_data_->get_conservative_rate_estimate();
     DLOG(INFO) << "Conservative rate estimate " << rate << ", real rate " << real_rate << ", ratio = "
         << ((double)rate.ToBitsPerSecond()) / real_rate.ToBitsPerSecond();
-    double rate_ewma_factor = 0.2;
     if (rate_ewma_ < 0) {
         rate_ewma_ = rate.ToBitsPerSecond();
     }
     rate_inst_ = real_rate.ToBitsPerSecond();
     rate_ewma_ = (int64_t)(rate_ewma_factor * real_rate.ToBitsPerSecond() + (1 - rate_ewma_factor) * rate_ewma_);
-    rate = QuicBandwidth::FromBitsPerSecond(rate_ewma_);
+    rate = QuicBandwidth::FromBitsPerSecond(rate_ewma_);*/
    
+    double rate_ewma_factor = 0.5;
+    QuicBandwidth rate = client_data_->get_latest_rate_estimate();
+    rate_ewma_ = rate.ToBitsPerSecond() * rate_ewma_factor + (1 - rate_ewma_factor)*rate_ewma_;
+    rate_inst_ = rate.ToBitsPerSecond();
+    DLOG(INFO) << "Measured rate to be " << rate.ToDebugValue();
     double utility;
     double adjusted_utility;
     bool prop_fairness = (client_data_->opt_target() == ClientData::OptTarget::propfair); // EXPERIMENTAL!
@@ -295,6 +299,7 @@ void ValueFuncAware::UpdateCwndMultiplier() {
             client_data_->opt_target() == ClientData::OptTarget::sum);
     DLOG(INFO) << "Optimization target is prop fairness? " << prop_fairness;
 
+    float mult_ewma = 0.3;
     if (!needs_deriv) {
         utility = client_data_->average_expected_qoe(rate);
         if (utility > 30) {
@@ -303,6 +308,7 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         adjusted_utility = log(1 + exp(utility));
     }
     else {
+        /*
         QuicBandwidth rate_m1 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() - 100000);
         //QuicBandwidth rate_m2 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() - 200000);
         //QuicBandwidth rate_m3 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() - 300000);
@@ -329,17 +335,21 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         //double d_utility4 = (q_p4 - q_m4)/0.8;
         //double d_utility5 = (q_p5 - q_m5)/1.0;
         double d_utility = d_utility1; //(d_utility1 + d_utility2 + d_utility3 + d_utility4 + d_utility5) / 4;
+        */
+        double d_utility = client_data_->qoe_deriv();
         DLOG(INFO) << "Derivative is " << d_utility; 
-        float t = 10;
-        d_utility = 1/t * log(1 + exp(t*d_utility));
+        //float t = 10;
+        //d_utility = 1/t * log(1 + exp(t*d_utility));
         if (prop_fairness) {
             utility = client_data_->average_expected_qoe(rate) / d_utility;
         } else {
             utility = 1.0 / d_utility;
         }
         adjusted_utility = fmin(utility, 30);
+        // In practice, the derivative is less stable.
+        mult_ewma = 0.05;
     }
-    value_ = utility;
+    value_ = adjusted_utility;
 
     double target;
     if (adjusted_utility == 0) {
@@ -364,7 +374,8 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     target = 0.83 * target;
     DLOG(INFO) << "Adjusted target = " << target;
 
-    float mult_ewma = 0.3;
+    // The mult_ewma factor is determined by the kind of fairness (maxmin, sum, etc).
+    // TODO(vikram): move to Trim().
     multiplier_ = mult_ewma * target + (1 - mult_ewma) * multiplier_;
     if (max_weight_ > 0) {
         multiplier_ = fmax(fmin(multiplier_, 5.0), 1.0);
@@ -379,6 +390,14 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     // UNCOMMENT BELOW TO SET MAX WEIGHT.
     //multiplier_ = fmax(fmin(multiplier_, max_weight_), 1);
     SetWeight(multiplier_);
+    last_multiplier_update_ = clock_->WallNow();
+}
+
+double ValueFuncAware::Trim(double new_multiplier) {
+    double secs_elapsed = clock_->WallNow().AbsoluteDifference(last_multiplier_update_).ToMilliseconds() / 1000.0;
+    // Only allow a change of 1 in the multiplier every 10 seconds.
+    double slack = 0.5;
+    return fmin(fmax(new_multiplier, multiplier_ - secs_elapsed * slack / 10), multiplier_ + secs_elapsed * slack / 10);
 }
 
 float ValueFuncAware::LossProbability() {

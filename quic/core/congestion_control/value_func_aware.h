@@ -79,6 +79,9 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
   bool isOption(std::string s);
   double ReadMaxWeight();
   float LossProbability();
+  // Trim the multiplier so that it doesn't change too much relative to the previous one.
+  // This depends on how much time has passed.
+  double Trim(double mult);
 
  private:
   friend class test::ValueFuncAwarePeer;
@@ -132,6 +135,7 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
   QuicTime::Delta weight_update_horizon_; 
 
   QuicWallTime start_time_;
+  QuicWallTime last_multiplier_update_;
 
   bool new_rate_update_;
   // kind of transport used - transFast/transReno/transCubic corresponding to

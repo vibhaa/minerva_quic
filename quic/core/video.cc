@@ -10,7 +10,7 @@
 #include <sstream>
 #include "net/quic/platform/api/quic_logging.h"
 
-#define VID_TRACES_DIR "/home/ubuntu/video_transport_simulator/video_traces/"
+#define VID_TRACES_DIR "/home/ubuntu/video_data/"
 namespace net {
 
 Video::Video():
@@ -136,15 +136,19 @@ void Video::set_fit_file(std::string fname) {
 	while(getline(f, t)) {
 		fit_params.push_back(std::stod(t));
 	}
+
+    DLOG(INFO) << "Fit params = " << fit_params[0] << " " << fit_params[1] << " " << fit_params[2];
 }
 
 double Video::get_fit_constant() {
 	return fit_params[2];
 }
 
-double Video::get_fit_at(double rate) { // rate in Kbps
-	return fit_params[0] + fit_params[1] * exp(-1.* fit_params[2]* rate/ 4300.);
+// Rate in Mbps
+double Video::get_fit_at(double rate) {
+	return fit_params[0] - fit_params[1] * exp(fit_params[2]* rate);
 }
+
 std::vector<double> Video::get_bitrates() {
 	return bitrates_;
 }

@@ -22,16 +22,18 @@ ClientData::ClientData(const QuicClock* clock)
       chunk_index_(-1),
       clock_(clock),
       last_qoe_update_(0.0),
-      past_qoes_(NULL),
+      past_qoes_(),
       past_qoe_chunks_(0),
       chunk_remainder_(0),
       rebuf_penalty_(5.0),
       smooth_penalty_(1.0),
+      waiting_(true),
       start_time_(clock->WallNow()),
       last_measurement_start_time_(clock->WallNow()),
       bytes_since_last_measurement_(0),
       last_record_time_(QuicWallTime::Zero()),
       last_buffer_update_time_(clock->WallNow()),
+      bw_waiting_interval_(QuicTime::Delta::FromMilliseconds(500)),
       bw_measurement_interval_(QuicTime::Delta::FromMilliseconds(500)),
       bw_measurements_(),
       value_func_(new ValueFuncRaw()),
@@ -42,12 +44,10 @@ ClientData::ClientData(const QuicClock* clock)
       cubic_utility_fn_(10, std::vector<double>(2)),
       maxmin_util_inverse_fn_("/home/ubuntu/video_data/TennisSeekingInverseAvg.fit"),
       sum_util_inverse_fn_("/home/ubuntu/video_data/TennisSeekingInverseDeriv.fit") {
-        past_qoes_ = new vector<double>();
-        init_cubic_inverse();
+          init_cubic_inverse();
       }
 
 ClientData::~ClientData() {
-    delete past_qoes_;
     delete value_func_;
 }
 
@@ -78,17 +78,18 @@ bool ClientData::update_chunk_remainder(QuicByteCount x) {
     last_record_time_ = clock_->WallNow();
     QuicTime::Delta interval = last_record_time_.AbsoluteDifference(last_measurement_start_time_);
     if (interval > bw_measurement_interval_) {
-        QuicBandwidth meas = QuicBandwidth::FromBytesAndTimeDelta(bytes_since_last_measurement_, interval);
-        DLOG(INFO) << "BYTEs ARE " << bytes_since_last_measurement_ << ", interval is " << interval << "measurement is" << meas;
-        int num_measurements = bw_measurements_.size();
-        if (num_measurements > 3){
-            DLOG(INFO) << "last three measurements are " << bw_measurements_[num_measurements-3] 
-                << bw_measurements_[num_measurements-2]
-                << bw_measurements_[num_measurements-1] ;
+        if (waiting_) {
+            waiting_ = false;
+            reset_bw_measurement();
+        } else {
+            QuicBandwidth meas = QuicBandwidth::FromBytesAndTimeDelta(bytes_since_last_measurement_, interval);
+            DLOG(INFO) << "BYTEs ARE " << bytes_since_last_measurement_ << ", interval is " << interval << "measurement is" << meas;
+            // Should really only be keeping the last one.
+            bw_measurements_.push_back(meas);
+            waiting_ = true;
+            reset_bw_measurement();
+            return true;
         }
-        bw_measurements_.push_back(meas);
-        reset_bw_measurement();
-        return true;
     }
     return false;
 }
@@ -245,20 +246,20 @@ ValueFunc* ClientData::get_value_func() {
 }
 
 void ClientData::set_past_qoe(double qoe) {
-    if (qoe > 0 && qoe != last_qoe_update_) {
+    DLOG(INFO) << "Setting qoe with " << qoe << ", last update = " << last_qoe_update_;
+    if (qoe > -1000 && qoe != last_qoe_update_) {
         double prev_chunk_qoe = qoe - last_qoe_update_;
         if (past_qoe_chunks_ >= 0) {
-            past_qoes_->push_back(prev_chunk_qoe);
+            past_qoes_.push_back(prev_chunk_qoe);
         }
         past_qoe_chunks_++;
+        last_qoe_update_ = qoe;
     }
-    last_qoe_update_ = qoe;
-
 }
 
 double ClientData::get_past_qoe() {
     double sum = 0;
-    for (const double q : *past_qoes_) {
+    for (const double q : past_qoes_) {
         sum += q;
     }
     return sum;
@@ -289,7 +290,32 @@ int ClientData::prev_bitrate() {
         return bitrates_[bitrates_.size()-2];
     }
     return current_bitrate();
-  }
+}
+
+double ClientData::qoe_deriv() {
+    double avg_br = 0;
+    // TODO(Vikram): compute the value function from here, use that to get the
+    // next 5 bitrates, and use those bitrates to compute the derivative here.
+    double ewma_factor = 0.3;
+    for (int b : bitrates_) {
+        if (avg_br == 0) {
+            avg_br = b;
+        } else {
+            avg_br = ewma_factor * b + (1 - ewma_factor) * avg_br;
+        }
+    }
+    // Convert from Kbps to Mbps.
+    avg_br /= 1000;
+    DLOG(INFO) << "Average bitrate = " << avg_br;
+    // Probe the derivative by querying the utility curve's fit approxmiation.
+    double delta = 0.1;
+    // 
+    double approx = vid_.get_fit_at(avg_br + delta);
+    approx -= vid_.get_fit_at(avg_br - delta);
+    approx /= (2 * delta);
+    DLOG(INFO) << "Deriv approx = " << approx;
+    return approx;
+}
 
 void ClientData::set_vid_prefix(std::string f) {
   if (vid_prefix_.length() > 0 ){
@@ -331,7 +357,7 @@ double ClientData::average_expected_qoe(QuicBandwidth rate) {
             buf, ((double)rate.ToBitsPerSecond())/(1000.0 * 1000.0),
             current_bitrate());
     value /= get_value_func()->Horizon();
-    int num_past_recorded_chunks = past_qoes_->size();
+    int num_past_recorded_chunks = past_qoes_.size();
     double past_qoe_weight = fmin(10, num_past_recorded_chunks);
     double cur_chunk_weight = 1.0;
     double value_weight = get_value_func()->Horizon();
