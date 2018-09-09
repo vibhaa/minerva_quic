@@ -10,7 +10,7 @@
 #include <sstream>
 #include "net/quic/platform/api/quic_logging.h"
 
-#define VID_TRACES_DIR "/home/ubuntu/video_data/"
+#define VID_TRACES_DIR "/home/ubuntu/efs/video_data/"
 namespace net {
 
 Video::Video():
@@ -69,6 +69,20 @@ void Video::set_video_file(std::string fname) {
 
 	DLOG(INFO) << "Video file set with #chunks: " << chunk_sizes_.size() << 
 				" #bitrates: " << bitrates_.size();
+}
+
+size_t Video::index_for_bitrate(int bitrate) {
+    for (size_t i = 0; i < bitrates_.size(); i++) {
+        if (bitrates_[i] == bitrate) {
+            return i;
+        }
+    }
+    return (size_t)(-1);
+}
+
+double Video::chunk_size(int chunk_ix, size_t bitrate_ix) {
+    int arr_ix = chunk_ix % chunk_sizes_.size();
+    return chunk_sizes_[arr_ix][bitrate_ix];
 }
 
 double Video::qoe(int __chunk_ix, double rate) { // rate in Kbps
@@ -152,5 +166,11 @@ double Video::get_fit_at(double rate) {
 std::vector<double> Video::get_bitrates() {
 	return bitrates_;
 }
+
+// Time in milliseconds.
+double Video::chunk_duration() {
+    return chunk_duration_;
+}
+
 
 } // namespace net

@@ -24,12 +24,16 @@ class Video {
   void set_fit_file(std::string);
   void set_screen_size(int);
 
+  size_t index_for_bitrate(int bitrate);
+  double chunk_size(int chunk_ix, size_t bitrate_ix);
+
   double vmaf_for_chunk(int bitrate);  
   double qoe(int chunk_ix, double rate);// rate in Kbps
   double vmaf_qoe(int chunk_ix, double rate);
 
   std::vector<double> string2vec(std::string s);
   std::vector<double> get_bitrates();
+  double chunk_duration();
 
   double get_fit_constant();
   double get_fit_at(double rate);

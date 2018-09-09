@@ -72,11 +72,14 @@ class QUIC_EXPORT_PRIVATE ClientData {
   // TODO(vikram/arc): Use VMAF here.
   double utility_for_bitrate(int bitrate);
   double qoe(int bitrate, double rebuf_time, int prev_bitrate);
+  // Uses the utility function to find the next 5 bitrates we would fetch under optimal conditions.
+  // Returns the average of these bitrates.
+  double future_avg_bitrate(QuicBandwidth rate);
   // Based on the average bitrate seen so far, returns an approximation to the derivative
   // of the utility curve, at that average bitrate.
   // Note that unlike qoe(), it is not dependent on the current buffer level, nor does it take
   // into account smoothness penalties or rebuffering.
-  double qoe_deriv();
+  double qoe_deriv(QuicBandwidth rate);
 
   // Returns the bitrate set by the most recent next_chunk(..) call.
   // If N/A, then returns 0.
@@ -127,6 +130,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   std::string vid_prefix_;
   VfType vf_type_;
   OptTarget opt_target_;
+  double past_avg_br_;
 
   std::vector<std::vector<double>> cubic_utility_fn_;
   // If we're optimizing for max-min fairness, this is the `inverse function' we use

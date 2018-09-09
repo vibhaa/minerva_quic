@@ -91,6 +91,8 @@ void ValueFuncRaw::ParseFrom(const string& filename) {
         return;
     }
 
+    string s;
+    file >> s >> horizon_;
     // Throw away the first array because it's just pos.
     ParseArray(&file);
     rates_ = ParseArray(&file);
@@ -126,7 +128,7 @@ void ValueFuncRaw::ParseFrom(const string& filename) {
         assert(line.size() == 0); 
     }
     parsed_ = true;
-    DLOG(INFO) << "Value func loaded. Size = ("
+    DLOG(INFO) << "Value func loaded. Horizon = " << horizon_ << ", Size = ("
         << values_.size() << " " << values_[0].size()
         << " " << values_[0][0].size() << ")";
 }

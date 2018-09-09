@@ -19,7 +19,7 @@ const int FIT_PARAMS_LENGTH = 3;
 
 ValueFuncFit::ValueFuncFit()
     : parsed_(false),
-      horizon_(5),
+      horizon_(10),
       buffers_(),
       rates_(),
       bitrates_(),
@@ -76,6 +76,7 @@ vector<double> ValueFuncFit::ParseArray(ifstream *file) {
     int len;
     iss >> len;
     vector<double> arr(len, 0);
+    DLOG(INFO) << "Got name " << name << " with length " << len;
 
     getline(*file, line);
     istringstream vals(line);
@@ -83,9 +84,6 @@ vector<double> ValueFuncFit::ParseArray(ifstream *file) {
     for(int i = 0; i < len; i++) {
         vals >> next_val;
         arr[i] = next_val;
-    }
-    if (arr.size() != (size_t)len) {
-        DLOG(ERROR) << "ERROR: array length mismatch";
     }
     return arr;
 }
@@ -106,7 +104,11 @@ void ValueFuncFit::ParseFrom(const string& filename) {
         return;
     }
 
-    // Throw away the first array because it's just pos.
+    string line, s;
+    getline(file, line);
+    istringstream iss(line);
+    iss >> s >> horizon_;
+
     rates_ = ParseArray(&file);
     buffers_ = ParseArray(&file);
     vector<double> bitrates_fl = ParseArray(&file);
@@ -116,11 +118,9 @@ void ValueFuncFit::ParseFrom(const string& filename) {
         bitrates_[i] = (int)bitrates_fl[i];
         br_inverse_[bitrates_[i]] = i;
     }
-    // Parse out values now
-    string line;
-    istringstream iss;
     // Ignore. TODO(vikram): check dimensions
     values_.resize(rates_.size());
+    DLOG(INFO) << "Rates size " << rates_.size() << ", bitrates " << bitrates_fl.size();
     for (size_t i = 0; i < rates_.size(); i++) {
         values_[i].resize(bitrates_fl.size());
         for (size_t j = 0; j < bitrates_fl.size(); j++) {
@@ -139,7 +139,7 @@ void ValueFuncFit::ParseFrom(const string& filename) {
         assert(line.size() == 0);
     }
     parsed_ = true;
-    DLOG(INFO) << "Value func loaded. Size = ("
+    DLOG(INFO) << "Value func loaded. Horizon = " << horizon_ << ", Size = ("
         << values_.size() << " " << values_[0].size()
         << " " << values_[0][0].size() << ")";
 }

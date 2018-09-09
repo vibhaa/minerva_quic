@@ -15,6 +15,8 @@ using namespace std;
 
 namespace net {
 
+const string& NORMALIZER_FN_DIR = "/home/ubuntu/efs/video_data";
+
 ClientData::ClientData(const QuicClock* clock)
     : buffer_estimate_(0.0),
       screen_size_(0.0),
@@ -41,9 +43,10 @@ ClientData::ClientData(const QuicClock* clock)
       bitrates_(),
       vf_type_(),
       opt_target_(),
+      past_avg_br_(0.0),
       cubic_utility_fn_(10, std::vector<double>(2)),
-      maxmin_util_inverse_fn_("/home/ubuntu/video_data/TennisSeekingInverseAvg.fit"),
-      sum_util_inverse_fn_("/home/ubuntu/video_data/TennisSeekingInverseDeriv.fit") {
+      maxmin_util_inverse_fn_(NORMALIZER_FN_DIR + "/TennisSeekingInverseAvg.fit"),
+      sum_util_inverse_fn_(NORMALIZER_FN_DIR + "/TennisSeekingInverseDeriv.fit") {
           init_cubic_inverse();
       }
 
@@ -292,24 +295,61 @@ int ClientData::prev_bitrate() {
     return current_bitrate();
 }
 
-double ClientData::qoe_deriv() {
+double ClientData::future_avg_bitrate(QuicBandwidth cur_rate) {
+    double cur_rate_Mb = ((double)cur_rate.ToBitsPerSecond())/(1000.0 * 1000.0);
+    double buf = get_buffer_estimate();
+    double avg_br = 0;
+    int horizon = 5;
+    vector<double> vid_bitrates = vid_.get_bitrates();
+    size_t cur_br_ix = vid_.index_for_bitrate(current_bitrate());
+    for (int hzn = 0; hzn < horizon; hzn++) {
+        double max_cand = 0;
+        size_t best_br = 0;
+        for (size_t i = 0; i < vid_bitrates.size(); i++) {
+            double next_buf = buf - vid_.chunk_size(get_chunk_index(), cur_br_ix) / cur_rate_Mb +
+                vid_.chunk_duration();
+            double candidate = qoe(vid_bitrates[cur_br_ix], 0, vid_bitrates[i]) +
+                get_value_func()->ValueFor(next_buf,
+                        ((double)cur_rate.ToBitsPerSecond())/(1000.0 * 1000.0),
+                        vid_bitrates[cur_br_ix]);
+            if (candidate > max_cand) {
+                max_cand = candidate;
+                best_br = i;
+            }
+        }
+        DLOG(INFO) << "Estimated future bitrate: " << vid_bitrates[cur_br_ix];
+        avg_br += vid_bitrates[cur_br_ix];
+        cur_br_ix = best_br;
+        buf = buf - vid_.chunk_size(get_chunk_index(), cur_br_ix) / cur_rate_Mb + 
+            vid_.chunk_duration();
+    }
+    DLOG(INFO) << "Qoe deriv calculation: future bitrate avg is " << avg_br / horizon;
+    return avg_br / horizon;
+}
+
+double ClientData::qoe_deriv(QuicBandwidth rate) {
     double avg_br = 0;
     // TODO(Vikram): compute the value function from here, use that to get the
     // next 5 bitrates, and use those bitrates to compute the derivative here.
-    double ewma_factor = 0.3;
-    for (int b : bitrates_) {
-        if (avg_br == 0) {
-            avg_br = b;
-        } else {
-            avg_br = ewma_factor * b + (1 - ewma_factor) * avg_br;
-        }
+    double ewma_factor = 0.1;
+    int lookpast = 3;
+    DLOG(INFO) << "here1";
+    for (int i = bitrates_.size()-1; i >= (int)bitrates_.size() - 1 - lookpast && i >= 0; i--) {
+        avg_br += bitrates_[i];
     }
+    DLOG(INFO) << "here2";
+    int lookahead = 5;
     // Convert from Kbps to Mbps.
+    avg_br += future_avg_bitrate(rate) * lookahead;
+    avg_br /= (lookahead + lookpast);
     avg_br /= 1000;
+    if (past_avg_br_ > 0.0) {
+        avg_br = ewma_factor * avg_br + (1 - ewma_factor) * past_avg_br_;
+    }
+    past_avg_br_ = avg_br;
     DLOG(INFO) << "Average bitrate = " << avg_br;
     // Probe the derivative by querying the utility curve's fit approxmiation.
     double delta = 0.1;
-    // 
     double approx = vid_.get_fit_at(avg_br + delta);
     approx -= vid_.get_fit_at(avg_br - delta);
     approx /= (2 * delta);

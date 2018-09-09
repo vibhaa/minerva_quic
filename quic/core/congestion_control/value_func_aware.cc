@@ -336,14 +336,14 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         //double d_utility5 = (q_p5 - q_m5)/1.0;
         double d_utility = d_utility1; //(d_utility1 + d_utility2 + d_utility3 + d_utility4 + d_utility5) / 4;
         */
-        double d_utility = client_data_->qoe_deriv();
+        double d_utility = client_data_->qoe_deriv(QuicBandwidth::FromBitsPerSecond(rate_ewma_));
         DLOG(INFO) << "Derivative is " << d_utility; 
         //float t = 10;
         //d_utility = 1/t * log(1 + exp(t*d_utility));
         if (prop_fairness) {
             utility = client_data_->average_expected_qoe(rate) / d_utility;
         } else {
-            utility = 1.0 / d_utility;
+            utility = 4.0 - log(d_utility);
         }
         adjusted_utility = fmin(utility, 30);
         // In practice, the derivative is less stable.

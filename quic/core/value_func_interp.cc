@@ -145,6 +145,8 @@ void ValueFuncInterp::ParseFrom(const string& filename) {
         return;
     }
 
+    string s;
+    file >> s >> horizon_;
     rates_ = ParseArray(&file);
     buffers_ = ParseArray(&file);
     vector<double> bitrates_fl = ParseArray(&file);
@@ -185,7 +187,7 @@ void ValueFuncInterp::ParseFrom(const string& filename) {
         assert(line.size() == 0);
     }
     parsed_ = true;
-    DLOG(INFO) << "Value func loaded. Size = ("
+    DLOG(INFO) << "Value func loaded. Horizon = " << horizon_ << ", Size = ("
         << values_.size() << " " << values_[0].size()
         << " " << values_[0][0].size() << ")";
 }
