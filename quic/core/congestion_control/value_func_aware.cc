@@ -287,8 +287,11 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     rate_ewma_ = (int64_t)(rate_ewma_factor * real_rate.ToBitsPerSecond() + (1 - rate_ewma_factor) * rate_ewma_);
     rate = QuicBandwidth::FromBitsPerSecond(rate_ewma_);*/
    
-    double rate_ewma_factor = 0.5;
+    double rate_ewma_factor = 0.3;
     QuicBandwidth rate = client_data_->get_latest_rate_estimate();
+    if (rate_ewma_ < 0) {
+        rate_ewma_ = rate.ToBitsPerSecond();
+    }
     rate_ewma_ = rate.ToBitsPerSecond() * rate_ewma_factor + (1 - rate_ewma_factor)*rate_ewma_;
     rate_inst_ = rate.ToBitsPerSecond();
     DLOG(INFO) << "Measured rate to be " << rate.ToDebugValue();
@@ -497,10 +500,6 @@ void ValueFuncAware::MaybeIncreaseCwnd(
                      << "}\n";
       }
   }
-  else {
-    DLOG(INFO) << "ack without client data";
-  }
-
     
   QUIC_BUG_IF(InRecovery()) << "Never increase the CWND during recovery.";
   // Do not increase the congestion window unless the sender is close to using

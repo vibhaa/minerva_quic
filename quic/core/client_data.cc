@@ -15,7 +15,7 @@ using namespace std;
 
 namespace net {
 
-const string& NORMALIZER_FN_DIR = "/home/ubuntu/efs/video_data";
+const string& NORMALIZER_FN_DIR = "/home/ubuntu/video_data";
 
 ClientData::ClientData(const QuicClock* clock)
     : buffer_estimate_(0.0),
@@ -328,10 +328,9 @@ double ClientData::future_avg_bitrate(QuicBandwidth cur_rate) {
 }
 
 double ClientData::qoe_deriv(QuicBandwidth rate) {
-    double avg_br = 0;
+    /*double avg_br = 0;
     // TODO(Vikram): compute the value function from here, use that to get the
     // next 5 bitrates, and use those bitrates to compute the derivative here.
-    double ewma_factor = 0.1;
     int lookpast = 3;
     DLOG(INFO) << "here1";
     for (int i = bitrates_.size()-1; i >= (int)bitrates_.size() - 1 - lookpast && i >= 0; i--) {
@@ -342,7 +341,9 @@ double ClientData::qoe_deriv(QuicBandwidth rate) {
     // Convert from Kbps to Mbps.
     avg_br += future_avg_bitrate(rate) * lookahead;
     avg_br /= (lookahead + lookpast);
-    avg_br /= 1000;
+    avg_br /= 1000;*/
+    double ewma_factor = 0.1;
+    double avg_br = rate.ToKBitsPerSecond() / 1000.0;
     if (past_avg_br_ > 0.0) {
         avg_br = ewma_factor * avg_br + (1 - ewma_factor) * past_avg_br_;
     }
@@ -411,10 +412,14 @@ double ClientData::average_expected_qoe(QuicBandwidth rate) {
     } else {
         // Phase in the contributions from past QoE and current chunk over the first 10 chunks.
         // If they're introduced too quickly / all at once, the multiplier will spike.
-        avg_est_qoe += value * (past_qoe_weight - num_past_recorded_chunks) + get_past_qoe();
+        avg_est_qoe += cur_qoe + get_past_qoe();
+        total_weight += cur_chunk_weight + num_past_recorded_chunks;
+        avg_est_qoe += value * (10 - num_past_recorded_chunks);
+        total_weight += 10 - num_past_recorded_chunks;
+        /*avg_est_qoe += value * (past_qoe_weight - num_past_recorded_chunks) + get_past_qoe();
         total_weight += past_qoe_weight;
         avg_est_qoe += past_qoe_weight * cur_qoe / 10;
-        total_weight += past_qoe_weight / 10;
+        total_weight += past_qoe_weight / 10;*/
     }
     avg_est_qoe /= total_weight;
     DLOG(INFO) << "Past qoe = " << get_past_qoe()
