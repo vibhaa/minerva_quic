@@ -43,6 +43,9 @@ float FunctionTable::Eval(float arg) const {
 void FunctionTable::LoadFromFile(const std::string& filename) {
     float a, v;
     std::ifstream f(filename);
+    if !f.good() {
+        DLOG(ERROR) << "Stop! Normalization function file not found.";
+    }
     while (f >> a >> v) {
         FnPoint p(a, v);
         table_.push_back(p);
