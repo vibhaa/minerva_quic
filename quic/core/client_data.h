@@ -131,6 +131,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   VfType vf_type_;
   OptTarget opt_target_;
   double past_avg_br_;
+  double past_deriv_;
 
   std::vector<std::vector<double>> cubic_utility_fn_;
   // If we're optimizing for max-min fairness, this is the `inverse function' we use

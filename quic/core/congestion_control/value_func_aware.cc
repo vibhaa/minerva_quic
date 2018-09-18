@@ -346,11 +346,11 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         if (prop_fairness) {
             utility = client_data_->average_expected_qoe(rate) / d_utility;
         } else {
-            utility = 4.0 - log(d_utility);
+            utility = 4.0 - pow(log(d_utility), 0.5);
         }
         adjusted_utility = fmin(utility, 30);
         // In practice, the derivative is less stable.
-        mult_ewma = 0.05;
+        mult_ewma = 0.1;
     }
     value_ = adjusted_utility;
 
@@ -374,7 +374,10 @@ void ValueFuncAware::UpdateCwndMultiplier() {
    
     // Correction to deal with cubic not respecting ratios well
     // Another possibility to try is to inflate the measured rate but normalize with the real one?.
-    target = 0.83 * target;
+    if (needs_deriv)
+        target = 0.83 * target;
+    else
+        target = 0.83 * target;
     DLOG(INFO) << "Adjusted target = " << target;
 
     // The mult_ewma factor is determined by the kind of fairness (maxmin, sum, etc).

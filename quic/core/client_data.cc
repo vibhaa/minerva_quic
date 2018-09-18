@@ -15,7 +15,7 @@ using namespace std;
 
 namespace net {
 
-const string& NORMALIZER_FN_DIR = "/home/ubuntu/video_data";
+const string& NORMALIZER_FN_DIR = "/home/ubuntu/efs/video_data";
 
 ClientData::ClientData(const QuicClock* clock)
     : buffer_estimate_(0.0),
@@ -44,6 +44,7 @@ ClientData::ClientData(const QuicClock* clock)
       vf_type_(),
       opt_target_(),
       past_avg_br_(0.0),
+      past_deriv_(0.0),
       cubic_utility_fn_(10, std::vector<double>(2)),
       maxmin_util_inverse_fn_(NORMALIZER_FN_DIR + "/TennisSeekingInverseAvg.fit"),
       sum_util_inverse_fn_(NORMALIZER_FN_DIR + "/TennisSeekingInverseDeriv.fit") {
@@ -332,6 +333,7 @@ double ClientData::qoe_deriv(QuicBandwidth rate) {
     // TODO(Vikram): compute the value function from here, use that to get the
     // next 5 bitrates, and use those bitrates to compute the derivative here.
     int lookpast = 3;
+
     DLOG(INFO) << "here1";
     for (int i = bitrates_.size()-1; i >= (int)bitrates_.size() - 1 - lookpast && i >= 0; i--) {
         avg_br += bitrates_[i];
@@ -347,6 +349,7 @@ double ClientData::qoe_deriv(QuicBandwidth rate) {
     if (past_avg_br_ > 0.0) {
         avg_br = ewma_factor * avg_br + (1 - ewma_factor) * past_avg_br_;
     }
+
     past_avg_br_ = avg_br;
     DLOG(INFO) << "Average bitrate = " << avg_br;
     // Probe the derivative by querying the utility curve's fit approxmiation.
@@ -354,6 +357,9 @@ double ClientData::qoe_deriv(QuicBandwidth rate) {
     double approx = vid_.get_fit_at(avg_br + delta);
     approx -= vid_.get_fit_at(avg_br - delta);
     approx /= (2 * delta);
+
+    //approx = ewma_factor * approx + (1 - ewma_factor) * past_deriv_;
+    past_deriv_ = approx;
     DLOG(INFO) << "Deriv approx = " << approx;
     return approx;
 }
@@ -365,6 +371,12 @@ void ClientData::set_vid_prefix(std::string f) {
   DLOG(INFO) << "set_vid_prefix called with argument " << f;
   vid_prefix_ = f;
   vid_.set_vid_prefix(vid_prefix_);
+
+  if (vid_prefix_.find("Psnr") != std::string::npos){
+        maxmin_util_inverse_fn_ = FunctionTable(NORMALIZER_FN_DIR + "/TennisSeekingPsnrVmafCombinedInverseAvg.fit");
+        sum_util_inverse_fn_ = FunctionTable(NORMALIZER_FN_DIR + "/TennisSeekingPsnrVmafCombinedInverseDeriv.fit");
+  }
+
 }
 
 Video* ClientData::get_vid() {
