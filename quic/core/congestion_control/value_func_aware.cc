@@ -359,7 +359,9 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         adjusted_utility = 0.1;
     }
     //adjusted_value_ = adjusted_utility; //(adjusted_utility*adjusted_utility/20.0 + 1)/10.0;
+    DLOG(INFO) << "before normalizing utility";
     adjusted_value_ = client_data_->normalize_utility(adjusted_utility);
+    DLOG(INFO) << "after normalizing utility";
     if (client_data_->get_chunk_index() >= 1) {
         // The Cubic inverse is in Mbps. Convert to Kbps.
         target = rate.ToKBitsPerSecond()/(1000.0 * (adjusted_value_));
