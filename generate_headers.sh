@@ -3,7 +3,6 @@ for vid in sony
 do
 	vid_dir=www.example3.org/$vid/
 	server=ec2-52-201-222-187.compute-1.amazonaws.com\:8000
-        #128.30.10.95\:8000 # vid_dir=www.example3.org/$vid/
 	
 	mkdir $vid_dir
 	# get files with HTTP headers
