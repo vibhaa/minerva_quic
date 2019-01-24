@@ -15,8 +15,6 @@ using namespace std;
 
 namespace net {
 
-const int FIT_PARAMS_LENGTH = 3;
-
 ValueFuncFit::ValueFuncFit()
     : parsed_(false),
       horizon_(10),
@@ -33,24 +31,27 @@ ValueFuncFit::ValueFuncFit(const string& filename)
 
 ValueFuncFit::~ValueFuncFit() {}
 
-double ValueFuncFit::ValueFor(double buffer, double rate, int prev_bitrate) {
+double ValueFuncFit::ValueFor(size_t chunk_ix, double buffer, double rate, int prev_bitrate) {
     size_t rate_ix = 0;
     size_t upper_rate_ix = 0;
     if (rate > rates_[0]) {
         double rate_delta_ = rates_[1] - rates_[0];
-        rate_ix = (size_t)((rate - rates_[0]) / rate_delta_);
+        double rdiff = fmax(0, rate - rates_[0]);
+        rate_ix = (size_t)(rdiff / rate_delta_);
         rate_ix = max((size_t)0, min(rate_ix, rates_.size() - 1)); 
         upper_rate_ix = min(rates_.size() - 1, rate_ix + 1); 
     }
     int br_ix = br_inverse_[prev_bitrate];
-    vector<double> params = values_[upper_rate_ix][br_ix];
+    chunk_ix = min(chunk_ix, num_chunks_-1);
+    array<float, NUM_FIT_PARAMS> params = values_[chunk_ix][upper_rate_ix][br_ix];
     // The params are the a,b,c for: a - b*exp(-cx)
     double value_up = params[0] - params[1] * exp(params[2]*buffer);
-    params = values_[rate_ix][br_ix];
+    params = values_[chunk_ix][rate_ix][br_ix];
     double value_down = params[0] - params[1] * exp(params[2]*buffer);
     double rate_frac = 1;
     if (upper_rate_ix > rate_ix) {
-        rate_frac = (rate - rates_[rate_ix])/(rates_[upper_rate_ix] - rates_[rate_ix]);
+        double rdiff = fmax(0, rate - rates_[rate_ix]);
+        rate_frac = rdiff / (rates_[upper_rate_ix] - rates_[rate_ix]);
     }
 
     // Interpolate over the two rate options.
@@ -108,6 +109,10 @@ void ValueFuncFit::ParseFrom(const string& filename) {
     getline(file, line);
     istringstream iss(line);
     iss >> s >> horizon_;
+    getline(file, line);
+    iss.str(line);
+    iss.clear();
+    iss >> s >> num_chunks_;
 
     rates_ = ParseArray(&file);
     buffers_ = ParseArray(&file);
@@ -119,29 +124,35 @@ void ValueFuncFit::ParseFrom(const string& filename) {
         br_inverse_[bitrates_[i]] = i;
     }
     // Ignore. TODO(vikram): check dimensions
-    values_.resize(rates_.size());
+    values_.resize(num_chunks_);
     DLOG(INFO) << "Rates size " << rates_.size() << ", bitrates " << bitrates_fl.size();
-    for (size_t i = 0; i < rates_.size(); i++) {
-        values_[i].resize(bitrates_fl.size());
-        for (size_t j = 0; j < bitrates_fl.size(); j++) {
-            values_[i][j].resize(FIT_PARAMS_LENGTH);
-            getline(file, line);
-            iss.str(line);
-            iss.clear();
-            float val;
-            for (size_t k = 0; k < FIT_PARAMS_LENGTH; k++) {
-                assert(iss.good());
-                iss >> val;
-                values_[i][j][k] = val;
+    for (size_t n = 0; n < num_chunks_; n++) {
+        values_[n].resize(rates_.size());
+        for (size_t i = 0; i < rates_.size(); i++) {
+            values_[n][i].resize(bitrates_fl.size());
+            file.read((char *) values_[n][i].data(), bitrates_fl.size() * NUM_FIT_PARAMS * sizeof(float));
+            /*for (size_t j = 0; j < bitrates_fl.size(); j++) {
+                values_[n][i][j].resize(FIT_PARAMS_LENGTH);
+                getline(file, line);
+                iss.str(line);
+                iss.clear();
+                float val;
+                for (size_t k = 0; k < FIT_PARAMS_LENGTH; k++) {
+                    assert(iss.good());
+                    iss >> val;
+                    values_[n][i][j][k] = val;
+                }
             }
+            getline(file, line);
+            assert(line.size() == 0);*/
         }
-        getline(file, line);
-        assert(line.size() == 0);
     }
     parsed_ = true;
     DLOG(INFO) << "Value func loaded. Horizon = " << horizon_ << ", Size = ("
         << values_.size() << " " << values_[0].size()
         << " " << values_[0][0].size() << ")";
+    DLOG(INFO) << "Test probe: chunk 11, rate 5, br 2: " << values_[11][5][2][0]
+        << " " << values_[11][5][2][1] << " " << values_[11][5][2][2];
 }
 
 }  // namespace net

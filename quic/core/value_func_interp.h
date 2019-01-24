@@ -26,22 +26,28 @@ class QUIC_EXPORT_PRIVATE ValueFuncInterp : public ValueFunc {
   ~ValueFuncInterp() override;
 
   // Expects the buffer in seconds, rate in Mbits/sec.
-  double ValueFor(double buffer, double rate, int prev_bitrate) override;
+  double ValueFor(size_t chunk_ix, double buffer, double rate, int prev_bitrate) override;
   int Horizon() override;
   string ArrToString(vector<double> arr) override;
 
  private:
-  double ValueForParams(double buffer, const std::vector<std::vector<double>>& params);
-  size_t FindBinarySearch(vector<double> values, size_t min_ix, size_t max_ix, double query);
+  double ValueForParams(double buffer, const std::vector<std::vector<float>>& params);
+  size_t FindBinarySearch(vector<float> values, size_t min_ix, size_t max_ix, double query);
   void ParseFrom(const string& filename);
   vector<double> ParseArray(ifstream *file);
 
   bool parsed_;
   int horizon_;
+  int num_chunks_;
   vector<double> buffers_;
   vector<double> rates_;
   vector<int> bitrates_;
-  vector<vector<vector<vector<double>>>> values_;
+  // First dim: chunk index
+  // Second dim: rate
+  // Third dim: previous bitrate
+  // Fourth dim: x or y axis (dim 2)
+  // Fifth dim: coordinates
+  vector<vector<vector<vector<vector<float>>>>> values_;
   // Inverse map from bitrate to index in bitrates_;
   map<int, int> br_inverse_;
 };

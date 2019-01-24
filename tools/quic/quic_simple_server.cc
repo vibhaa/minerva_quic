@@ -164,7 +164,7 @@ void QuicSimpleServer::StartReading() {
   int result = socket_->RecvFrom(
       read_buffer_.get(), read_buffer_->size(), &client_address_,
       base::Bind(&QuicSimpleServer::OnReadComplete, base::Unretained(this)));
-
+  
   if (result == ERR_IO_PENDING) {
     synchronous_read_count_ = 0;
     if (dispatcher_->HasChlosBuffered()) {

@@ -48,6 +48,8 @@ class QUIC_EXPORT_PRIVATE ClientData {
   void set_buffer_estimate(double current_buffer);
   void set_screen_size(double ss);
   void set_trace_file(std::string);
+  void set_inverse_function_file(const std::string&);
+  void set_rtt(int rtt);
   double get_client_id();
   Video* get_video();
   std::string get_trace_file();
@@ -70,7 +72,9 @@ class QUIC_EXPORT_PRIVATE ClientData {
   double get_past_qoe();
   // Computes the QoE via the definition.
   // TODO(vikram/arc): Use VMAF here.
-  double utility_for_bitrate(int bitrate);
+  double utility_for_bitrate(int chunk_ix, int bitrate);
+  // The average utility over all chunks at this bitrate.
+  double average_utility_for_bitrate(int bitrate);
   double qoe(int bitrate, double rebuf_time, int prev_bitrate);
   // Uses the utility function to find the next 5 bitrates we would fetch under optimal conditions.
   // Returns the average of these bitrates.
@@ -113,13 +117,13 @@ class QUIC_EXPORT_PRIVATE ClientData {
   // True if we're just biding our time, waiting for a full waiting interval before starting
   // the bandwidth measurement;
   bool waiting_;
+  int rtt_;
 
   QuicWallTime start_time_;
   QuicWallTime last_measurement_start_time_;
   QuicByteCount bytes_since_last_measurement_;
   QuicWallTime last_record_time_;
   QuicWallTime last_buffer_update_time_;
-  QuicTime::Delta bw_waiting_interval_;
   QuicTime::Delta bw_measurement_interval_;
   std::vector<QuicBandwidth> bw_measurements_;
   Video vid_;
@@ -133,7 +137,6 @@ class QUIC_EXPORT_PRIVATE ClientData {
   double past_avg_br_;
   double past_deriv_;
 
-  std::vector<std::vector<double>> cubic_utility_fn_;
   // If we're optimizing for max-min fairness, this is the `inverse function' we use
   // so that the average multiplier is equal to TCP's multiplier when in the steady state.  
   FunctionTable maxmin_util_inverse_fn_;

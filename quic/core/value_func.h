@@ -25,7 +25,7 @@ class QUIC_EXPORT_PRIVATE ValueFunc {
   virtual ~ValueFunc() {};
 
   // Expects the buffer in seconds, rate in Mbits/sec.
-  virtual double ValueFor(double buffer, double rate, int prev_bitrate) = 0;
+  virtual double ValueFor(size_t chunk_ix, double buffer, double rate, int prev_bitrate) = 0;
   virtual int Horizon() = 0;
   virtual string ArrToString(vector<double> arr) = 0;
 };

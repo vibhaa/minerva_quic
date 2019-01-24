@@ -63,11 +63,13 @@ int main(int argc, char* argv[]) {
     exit(0);
   }
 
+  DLOG(INFO) << "Starting response cache initialization";
   net::QuicHttpResponseCache response_cache;
   if (line->HasSwitch("quic_response_cache_dir")) {
     response_cache.InitializeFromDirectory(
         line->GetSwitchValueASCII("quic_response_cache_dir"));
   }
+  DLOG(INFO) << "Initialized response cache";
 
   if (line->HasSwitch("port")) {
     if (!base::StringToInt(line->GetSwitchValueASCII("port"), &FLAGS_port)) {

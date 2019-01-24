@@ -136,6 +136,8 @@ std::map<string, string> QuicSimpleServerStream::ParseClientParams(string path_s
   string vid_prefix = param_map["vid_prefix"];
   string vf_type = param_map["vf_type"];
   string opt_target = param_map["opt"];
+  string rtt = param_map["rtt"];
+  string inv_func = param_map["inverse"];
   QUIC_DVLOG(0) << "url is " << path_string << "  buffer is" << buffer << "screen size is" << screen;
 
   ClientData *cdata = spdy_session()->get_client_data();
@@ -148,6 +150,12 @@ std::map<string, string> QuicSimpleServerStream::ParseClientParams(string path_s
     cdata->set_trace_file(trace_file);
   if (past_qoe.length() > 0)
     cdata->set_past_qoe(stod(past_qoe));
+  if (rtt.length() > 0) {
+      cdata->set_rtt(stoi(rtt));
+  }
+  if (inv_func.length() > 0) {
+      cdata->set_inverse_function_file(inv_func);
+  }
   if (value_func.length() > 0) {
     if (vf_type.length() > 0) {
         cdata->set_vf_type(vf_type);

@@ -13,10 +13,13 @@ namespace net {
 
 class FunctionTable {
  public:
+  FunctionTable();
   FunctionTable(const std::string& filename);
   ~FunctionTable();
 
   float Eval(float arg) const;
+  // Reads a file (outputted by np.savetxt) to get the function.
+  void LoadFromFile(const std::string& filename);
 
  private:
   struct FnPoint {
@@ -25,8 +28,6 @@ class FunctionTable {
     FnPoint(float a, float v) : arg(a), val(v) {}
   };
 
-  // Reads a file (outputted by np.savetxt) to get the function.
-  void LoadFromFile(const std::string& filename);
   // Binary search within the function table to get the largest index
   // with argument less than or equal to arg.
   size_t IndexFor(float arg, size_t min_ix, size_t max_ix) const;

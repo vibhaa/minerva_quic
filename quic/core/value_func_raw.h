@@ -26,7 +26,7 @@ class QUIC_EXPORT_PRIVATE ValueFuncRaw : public ValueFunc {
   ~ValueFuncRaw() override;
 
   // Expects the buffer in seconds, rate in Mbits/sec.
-  double ValueFor(double buffer, double rate, int prev_bitrate) override;
+  double ValueFor(size_t chunk_ix, double buffer, double rate, int prev_bitrate) override;
   int Horizon() override;
   string ArrToString(vector<double> arr) override;
 

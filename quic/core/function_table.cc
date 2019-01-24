@@ -7,6 +7,8 @@
 
 namespace net {
 
+FunctionTable::FunctionTable() : table_() {}
+
 FunctionTable::FunctionTable(const std::string& filename)
     : table_() {
         LoadFromFile(filename);

@@ -324,7 +324,7 @@ double VmafAware::CwndMultiplier() {
     assert(prev_rate >= 0);
 
     // Figure out the weight to set here
-    double vmaf_weight;
+    double vmaf_weight = 0.0;
     if (isOption(PERCEPTUAL_QOE))
        vmaf_weight = QoeBasedWeight(prev_rate);
     else if (isOption(FIT_SS))

@@ -31,7 +31,7 @@ ValueFuncRaw::ValueFuncRaw(const string& filename)
 
 ValueFuncRaw::~ValueFuncRaw() {}
 
-double ValueFuncRaw::ValueFor(double buffer, double rate, int prev_bitrate) {
+double ValueFuncRaw::ValueFor(size_t chunk_ix, double buffer, double rate, int prev_bitrate) {
     if (true) {
         return 1.0;
     }

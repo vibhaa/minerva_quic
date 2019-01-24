@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <string>
+#include <math.h>
 
 #include "net/quic/core/client_data.h"
 
@@ -15,7 +16,7 @@ using namespace std;
 
 namespace net {
 
-const string& NORMALIZER_FN_DIR = "/home/ubuntu/efs/video_data";
+const string& NORMALIZER_FN_DIR = "/home/ubuntu/video_transport_simulator/video_traces/";
 
 ClientData::ClientData(const QuicClock* clock)
     : buffer_estimate_(0.0),
@@ -28,14 +29,13 @@ ClientData::ClientData(const QuicClock* clock)
       past_qoe_chunks_(0),
       chunk_remainder_(0),
       rebuf_penalty_(5.0),
-      smooth_penalty_(1.0),
+      smooth_penalty_(0.5),
       waiting_(true),
       start_time_(clock->WallNow()),
       last_measurement_start_time_(clock->WallNow()),
       bytes_since_last_measurement_(0),
       last_record_time_(QuicWallTime::Zero()),
       last_buffer_update_time_(clock->WallNow()),
-      bw_waiting_interval_(QuicTime::Delta::FromMilliseconds(500)),
       bw_measurement_interval_(QuicTime::Delta::FromMilliseconds(500)),
       bw_measurements_(),
       value_func_(new ValueFuncRaw()),
@@ -45,10 +45,8 @@ ClientData::ClientData(const QuicClock* clock)
       opt_target_(),
       past_avg_br_(0.0),
       past_deriv_(0.0),
-      cubic_utility_fn_(10, std::vector<double>(2)),
-      maxmin_util_inverse_fn_(NORMALIZER_FN_DIR + "/TennisSeekingInverseAvg.fit"),
-      sum_util_inverse_fn_(NORMALIZER_FN_DIR + "/TennisSeekingInverseDeriv.fit") {
-          init_cubic_inverse();
+      maxmin_util_inverse_fn_(),
+      sum_util_inverse_fn_() {
       }
 
 ClientData::~ClientData() {
@@ -135,8 +133,8 @@ QuicBandwidth ClientData::get_conservative_rate_estimate() {
         stdev += pow(m - avg, 2);
     }
     stdev = sqrt(stdev/lookback);
-    //double cons_rate = fmax(latest_rate - stdev, latest_rate * 0.5);
-    double cons_rate = fmax(avg - stdev, latest_rate * 0.5);
+    double cons_rate = fmax(latest_rate - 0.5*stdev, latest_rate * 0.8);
+    //double cons_rate = fmax(avg - stdev, latest_rate * 0.5);
     avg_rate_ = QuicBandwidth::FromBitsPerSecond(avg);
     return QuicBandwidth::FromBitsPerSecond(cons_rate);
 }
@@ -249,11 +247,15 @@ ValueFunc* ClientData::get_value_func() {
     return value_func_;
 }
 
+void ClientData::set_rtt(int rtt) {
+    rtt_ = rtt;
+}
+
 void ClientData::set_past_qoe(double qoe) {
     DLOG(INFO) << "Setting qoe with " << qoe << ", last update = " << last_qoe_update_;
     if (qoe > -1000 && qoe != last_qoe_update_) {
         double prev_chunk_qoe = qoe - last_qoe_update_;
-        if (past_qoe_chunks_ >= 0) {
+        if (past_qoe_chunks_ > 0) {
             past_qoes_.push_back(prev_chunk_qoe);
         }
         past_qoe_chunks_++;
@@ -269,17 +271,28 @@ double ClientData::get_past_qoe() {
     return sum;
 }
 
-double ClientData::utility_for_bitrate(int bitrate) {
-    double q = vid_.vmaf_for_chunk(bitrate);
-    if (q > 0) {
-        return q/5.0;
-    }
-    return 20 - 20.0 * exp(-3.0 * bitrate/4300.0 / screen_size_);
+double ClientData::utility_for_bitrate(int chunk_ix, int bitrate) {
+    double q = vid_.vmaf_for_chunk(chunk_ix, bitrate);
+    return q/5.0;
+}
+
+double ClientData::average_utility_for_bitrate(int bitrate) {
+    double q = vid_.avg_vmaf_for_bitrate(bitrate);
+    return q/5.0;
 }
 
 double ClientData::qoe(int bitrate, double rebuf, int prev_bitrate) {
-    return utility_for_bitrate(bitrate) - rebuf_penalty_ * rebuf
-       - smooth_penalty_ * abs(utility_for_bitrate(bitrate) - utility_for_bitrate(prev_bitrate));  
+    int chunk_ix = get_chunk_index();
+    double smooth_term = 0;
+    if (chunk_ix > 0) {
+       //smooth_term = smooth_penalty_ * abs(utility_for_bitrate(chunk_ix, bitrate) -
+       //        utility_for_bitrate(chunk_ix - 1, prev_bitrate));
+        smooth_term = smooth_penalty_ * abs(average_utility_for_bitrate(bitrate) -
+                average_utility_for_bitrate(prev_bitrate));
+    }
+    return utility_for_bitrate(chunk_ix, bitrate) - 2*rebuf_penalty_ * rebuf - smooth_term;
+      // vid_.avg_vmaf_for_bitrate(bitrate) - 
+      //         vid_.avg_vmaf_for_bitrate(prev_bitrate));  
 }
 
 int ClientData::current_bitrate() {
@@ -309,8 +322,9 @@ double ClientData::future_avg_bitrate(QuicBandwidth cur_rate) {
         for (size_t i = 0; i < vid_bitrates.size(); i++) {
             double next_buf = buf - vid_.chunk_size(get_chunk_index(), cur_br_ix) / cur_rate_Mb +
                 vid_.chunk_duration();
+            size_t chunk_ix = max(0, chunk_index_);
             double candidate = qoe(vid_bitrates[cur_br_ix], 0, vid_bitrates[i]) +
-                get_value_func()->ValueFor(next_buf,
+                get_value_func()->ValueFor(chunk_ix, next_buf,
                         ((double)cur_rate.ToBitsPerSecond())/(1000.0 * 1000.0),
                         vid_bitrates[cur_br_ix]);
             if (candidate > max_cand) {
@@ -373,8 +387,8 @@ void ClientData::set_vid_prefix(std::string f) {
   vid_.set_vid_prefix(vid_prefix_);
 
   if (vid_prefix_.find("Psnr") != std::string::npos){
-        maxmin_util_inverse_fn_ = FunctionTable(NORMALIZER_FN_DIR + "/TennisSeekingPsnrVmafCombinedInverseAvg.fit");
-        sum_util_inverse_fn_ = FunctionTable(NORMALIZER_FN_DIR + "/TennisSeekingPsnrVmafCombinedInverseDeriv.fit");
+        maxmin_util_inverse_fn_ = FunctionTable(NORMALIZER_FN_DIR + "/TennisSeekingPsnrInverseAvg.fit");
+        sum_util_inverse_fn_ = FunctionTable(NORMALIZER_FN_DIR + "/TennisSeekingPsnrInverseDeriv.fit");
   }
 
 }
@@ -388,6 +402,9 @@ double ClientData::average_expected_qoe(QuicBandwidth rate) {
     double buf = get_buffer_estimate();
     // Adjust the buffer for dash.
     buf -= 0.6;
+    if (get_chunk_index() < 5) {
+        buf = 20;
+    }
     double rebuf_time = 100.0;
     if (rate.ToBytesPerSecond() > 0) { 
         buf -= ((double)cs)/rate.ToBytesPerSecond();
@@ -406,13 +423,15 @@ double ClientData::average_expected_qoe(QuicBandwidth rate) {
         << ", prev bitrate " << prev_bitrate();
     double cur_qoe = qoe(current_bitrate(), rebuf_time, prev_bitrate());
     buf = fmax(0.0, buf) + 4.0;
-    double value = get_value_func()->ValueFor(
+    size_t chunk_ix = max(0, chunk_index_);
+    double value = get_value_func()->ValueFor(chunk_ix,
             buf, ((double)rate.ToBitsPerSecond())/(1000.0 * 1000.0),
             current_bitrate());
     value /= get_value_func()->Horizon();
+    DLOG(INFO) << "Average future per chunk value is " << value;
     int num_past_recorded_chunks = past_qoes_.size();
-    double past_qoe_weight = fmin(10, num_past_recorded_chunks);
-    double cur_chunk_weight = 1.0;
+    double past_qoe_weight = 0.0; //fmin(10, num_past_recorded_chunks);
+    double cur_chunk_weight = 2.0;
     double value_weight = get_value_func()->Horizon();
     double avg_est_qoe = value * value_weight;
     double total_weight = value_weight;
@@ -421,9 +440,13 @@ double ClientData::average_expected_qoe(QuicBandwidth rate) {
         total_weight += past_qoe_weight;
         avg_est_qoe += cur_qoe * cur_chunk_weight;
         total_weight += cur_chunk_weight;
+        DLOG(INFO) << "qoe = " << value * value_weight << " (" << value_weight << ") + "
+            << get_past_qoe() / num_past_recorded_chunks << " (" << past_qoe_weight << ") + "
+            << cur_qoe << " (" << cur_chunk_weight << ") = " << avg_est_qoe << " (total weight = " << total_weight << ")";
     } else {
         // Phase in the contributions from past QoE and current chunk over the first 10 chunks.
         // If they're introduced too quickly / all at once, the multiplier will spike.
+        DLOG(INFO) << "CASE WHERE num_recorded_chunks = 0: past_qoe = " << get_past_qoe();
         avg_est_qoe += cur_qoe + get_past_qoe();
         total_weight += cur_chunk_weight + num_past_recorded_chunks;
         avg_est_qoe += value * (10 - num_past_recorded_chunks);
@@ -440,6 +463,12 @@ double ClientData::average_expected_qoe(QuicBandwidth rate) {
         << ", ss = " << get_screen_size()
         << ", avg est qoe = " << avg_est_qoe; 
     return avg_est_qoe;
+}
+
+void ClientData::set_inverse_function_file(const std::string& filename) {
+    DLOG(INFO) << "Loading normalization function from " << NORMALIZER_FN_DIR << filename;
+    maxmin_util_inverse_fn_.LoadFromFile(NORMALIZER_FN_DIR + filename);
+    DLOG(INFO) << "Normalization function test probe 2.47: " << maxmin_util_inverse_fn_.Eval(2.47);
 }
 
 double ClientData::generic_fn_inverse(const vector<vector<double>>& table, double val) {
@@ -462,67 +491,19 @@ double ClientData::generic_fn_inverse(const vector<vector<double>>& table, doubl
     return frac*table[upper_ix][0] + (1-frac)*table[upper_ix-1][0];
 }
 
-void ClientData::init_cubic_inverse() {
-    // Hard code this for now for testing.
-    vector<vector<double>> vmaf1 {{0.375, 14.214970591},
-                                  {1.05, 37.8881577018},
-                                  {1.75, 49.4193675888},
-                                  {2.35, 59.3426629332},
-                                  {3.05, 66.3851950796},
-                                  {4.3, 77.019566865},
-                                  {5.8, 85.1433782961},
-                                  {7.5, 91.1899283228},
-                                  {15.0, 99.281165376},
-                                  {20.0, 99.8326275398}};
-    vector<vector<double>> vmaf2 {{0.375, 52.1474829247},
-                                  {0.75, 69.5570590818},
-                                  {1.05, 78.4550621593},
-                                  {1.75, 84.8456620831},
-                                  {3.05, 92.7166629274},
-                                  {4.3, 97.2253602622}};
-    vector<vector<double>> combined {{14.214970591, 0.0},
-                                     {37.8881577018, 0.0},
-                                     {49.4193675888, 0.0},
-                                     {52.1474829247, 0.0},
-                                     {59.3426629332, 0.0},
-                                     {66.3851950796, 0.0},
-                                     {69.5570590818, 0.0},
-                                     {77.019566865, 0.0},
-                                     {78.4550621593, 0.0},
-                                     {84.8456620831, 0.0},
-                                     {85.1433782961, 0.0},
-                                     {91.1899283228, 0.0},
-                                     {92.7166629274, 0.0},
-                                     {97.2253602622, 0.0},
-                                     {99.8326275398, 0.0}};
-    for (size_t i = 0; i < combined.size(); i++) {
-        double val = generic_fn_inverse(vmaf1, combined[i][0]) +
-            generic_fn_inverse(vmaf2, combined[i][0]);
-        combined[i][1] = val;
-        DLOG(INFO) << "Combined (U1-1 + U2-1 fn " << i << ": " << combined[i][0] << ", " << val;
-    }
-
-    vector<double> rates = {0.375, 0.75, 1.05, 1.75, 2.35, 3.05, 4.3, 5.8, 7.5, 15.0};
-    // At this point we have: combined(x) = (U_1^{-1}(x) + U_2^{-1}(x)).
-    // Now we need f^{-1}(x) = combined^{-1}(2x)
-    for (size_t i = 0; i < cubic_utility_fn_.size(); i++) {
-        cubic_utility_fn_[i][0] = rates[i];
-        double val = generic_fn_inverse(combined, 2*rates[i]) / 5;
-        cubic_utility_fn_[i][1] = val;
-        DLOG(INFO) << " Cubic utility fn " << i << ": " << rates[i] << ", " << val ;
-    }
-}
-
 float ClientData::normalize_utility(float arg) {
     switch (opt_target_) {
         case maxmin:
+            /*if (arg < 0) {
+                // Interpolates between 0.1 and 0.
+                return 0.1 * exp(arg);
+            }*/
             return maxmin_util_inverse_fn_.Eval(arg) / 2; 
         case sum:
             return sum_util_inverse_fn_.Eval(arg) / 2;
         case propfair:
             return arg;
     }
-    //return generic_fn_inverse(cubic_utility_fn_, arg) / 2;
 }
 
 }  // namespace net

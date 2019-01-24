@@ -124,15 +124,13 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
   double multiplier_;
 
   int64_t rate_ewma_;
+  int64_t rate_ewma2_;
   int64_t rate_inst_;
 
   QuicWallTime last_weight_update_time_;
 
   // The time over which we compute a rate.
   QuicTime::Delta rate_measurement_interval_;
-
-  // The speed at which we have the weight reach its new value.
-  QuicTime::Delta weight_update_horizon_; 
 
   QuicWallTime start_time_;
   QuicWallTime last_multiplier_update_;

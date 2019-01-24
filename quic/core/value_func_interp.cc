@@ -32,7 +32,7 @@ ValueFuncInterp::ValueFuncInterp(const string& filename)
 
 ValueFuncInterp::~ValueFuncInterp() {}
 
-size_t ValueFuncInterp::FindBinarySearch(vector<double> values, size_t min_ix, size_t max_ix, double query) {
+size_t ValueFuncInterp::FindBinarySearch(vector<float> values, size_t min_ix, size_t max_ix, double query) {
     size_t mid = (min_ix + max_ix) / 2;
     if (max_ix - min_ix <= 1) {
         return min_ix;
@@ -46,9 +46,9 @@ size_t ValueFuncInterp::FindBinarySearch(vector<double> values, size_t min_ix, s
     }
 }
 
-double ValueFuncInterp::ValueForParams(double buffer, const vector<vector<double>>& params) {
+double ValueFuncInterp::ValueForParams(double buffer, const vector<vector<float>>& params) {
     DLOG(INFO) << "Binary search on size " << params[0].size();
-    double maxbuf = 19.99;
+    double maxbuf = 100;
     double maxval = params[1][params[1].size() - 1];
     size_t ix;
     if (buffer >= maxbuf) {
@@ -75,7 +75,7 @@ double ValueFuncInterp::ValueForParams(double buffer, const vector<vector<double
     return value;
 }
 
-double ValueFuncInterp::ValueFor(double buffer, double rate, int prev_bitrate) {
+double ValueFuncInterp::ValueFor(size_t chunk_ix, double buffer, double rate, int prev_bitrate) {
     size_t rate_ix = 0;
     size_t upper_rate_ix = 0;
     if (rate > rates_[0]) {
@@ -85,12 +85,12 @@ double ValueFuncInterp::ValueFor(double buffer, double rate, int prev_bitrate) {
         upper_rate_ix = min(rates_.size() - 1, rate_ix + 1);
     }
     int br_ix = br_inverse_[prev_bitrate];
-    vector<vector<double>> params = values_[rate_ix][br_ix];
+    vector<vector<float>> params = values_[chunk_ix][rate_ix][br_ix];
     double value = ValueForParams(buffer, params);
     
     // Interpolate between different rates.
     if (upper_rate_ix > rate_ix) {
-        params = values_[upper_rate_ix][br_ix];
+        params = values_[chunk_ix][upper_rate_ix][br_ix];
         double value_down = ValueForParams(buffer, params);
         double rate_frac = (rate - rates_[rate_ix])/(rates_[upper_rate_ix] - rates_[rate_ix]);
         value = value * rate_frac + (1 - rate_frac) * value_down;
@@ -115,6 +115,7 @@ vector<double> ValueFuncInterp::ParseArray(ifstream *file) {
     int len;
     iss >> len;
     vector<double> arr(len, 0);
+    DLOG(INFO) << "Got name " << name << " with length " << len;
 
     getline(*file, line);
     istringstream vals(line);
@@ -144,9 +145,17 @@ void ValueFuncInterp::ParseFrom(const string& filename) {
         DLOG(ERROR) << "ERROR: Invalid value function file";
         return;
     }
-
-    string s;
-    file >> s >> horizon_;
+    DLOG(INFO) << "Opening " << filename << " for reading value function";
+    
+    string line, s;
+    getline(file, line);
+    istringstream iss(line);
+    iss >> s >> horizon_;
+    getline(file, line);
+    iss.str(line);
+    iss.clear();
+    iss >> s >> num_chunks_;
+    
     rates_ = ParseArray(&file);
     buffers_ = ParseArray(&file);
     vector<double> bitrates_fl = ParseArray(&file);
@@ -156,40 +165,50 @@ void ValueFuncInterp::ParseFrom(const string& filename) {
         bitrates_[i] = (int)bitrates_fl[i];
         br_inverse_[bitrates_[i]] = i;
     }
-    // Parse out values now
-    string line;
-    istringstream iss;
-    values_.resize(rates_.size());
-    for (size_t i = 0; i < rates_.size(); i++) {
-        values_[i].resize(bitrates_fl.size());
-        for (size_t j = 0; j < bitrates_fl.size(); j++) {
-            values_[i][j].resize(2);
-            getline(file, line);
-            iss.str(line);
-            iss.clear();
-            float val;
-            while (iss.good()) {
-                iss >> val;
-                values_[i][j][0].push_back(val);
+    DLOG(INFO) << "Horizon = " << horizon_ << ", # chunks = " << num_chunks_;
+    DLOG(INFO) << "Rates: " << ArrToString(rates_);
+    DLOG(INFO) << "Bufs: " << ArrToString(buffers_);
+    DLOG(INFO) << "Brs: " << ArrToString(bitrates_fl);
+    
+    values_.resize(num_chunks_);
+    for (int n = 0; n < num_chunks_; n++) {
+        values_[n].resize(rates_.size());
+        for (size_t i = 0; i < rates_.size(); i++) {
+            values_[n][i].resize(bitrates_fl.size());
+            for (size_t j = 0; j < bitrates_fl.size(); j++) {
+                values_[n][i][j].resize(2);
+                int32_t len;
+                file.read((char *)&len, sizeof(int32_t));
+                values_[n][i][j][0].resize(len);
+                file.read((char *)values_[n][i][j][0].data(), len * sizeof(float));
+                values_[n][i][j][1].resize(len);
+                file.read((char *)values_[n][i][j][1].data(), len * sizeof(float));
+                /*getline(file, line);
+                iss.str(line);
+                iss.clear();
+                float val;
+                while (iss.good()) {
+                    iss >> val;
+                    values_[i][j][0].push_back(val);
+                }
+                getline(file, line);
+                iss.str(line);
+                iss.clear();
+                while (iss.good()) {
+                    iss >> val;
+                    values_[i][j][1].push_back(val);
+                }
+                assert(values_[i][j][0].size() == values_[i][j][1].size());
+                getline(file, line);
+                assert(line.size() == 0);*/
             }
-            getline(file, line);
-            iss.str(line);
-            iss.clear();
-            while (iss.good()) {
-                iss >> val;
-                values_[i][j][1].push_back(val);
-            }
-            assert(values_[i][j][0].size() == values_[i][j][1].size());
-            getline(file, line);
-            assert(line.size() == 0);
         }
-        getline(file, line);
-        assert(line.size() == 0);
     }
     parsed_ = true;
     DLOG(INFO) << "Value func loaded. Horizon = " << horizon_ << ", Size = ("
         << values_.size() << " " << values_[0].size()
         << " " << values_[0][0].size() << ")";
+    DLOG(INFO) << "Test probe: chunk 11, rate 5, br 2, 0, 1: " << values_[11][5][2][0][1];
 }
 
 }  // namespace net

@@ -10,7 +10,7 @@
 #include <sstream>
 #include "net/quic/platform/api/quic_logging.h"
 
-#define VID_TRACES_DIR "/home/ubuntu/efs/video_data/"
+#define VID_TRACES_DIR "/home/ubuntu/video_transport_simulator/video_traces/"
 namespace net {
 
 Video::Video():
@@ -85,23 +85,40 @@ double Video::chunk_size(int chunk_ix, size_t bitrate_ix) {
     return chunk_sizes_[arr_ix][bitrate_ix];
 }
 
-double Video::qoe(int __chunk_ix, double rate) { // rate in Kbps
+/*double Video::qoe(int __chunk_ix, double rate) { // rate in Kbps
 
 	assert(rate >= 0);
 
 	double qoe = 20.0 - 20.0 * exp(-3.0 * rate / ss_ / 4300.0);
 
 	return qoe;
-}
+}*/
 
 // Assumes only one chunk.
-double Video::vmaf_for_chunk(int bitrate) {
-    for (size_t i = 0; i < vmafs_.size(); i++) {
-        if ((int)(bitrates_[i]) == bitrate) {
-            return vmafs_[0][i];
+double Video::vmaf_for_chunk(int chunk_ix, int bitrate) {
+    size_t br_ix = 0;
+    for (size_t i = 0; i < bitrates_.size(); i++) {
+        if ((int)bitrates_[i] == bitrate) {
+            br_ix = i;
+            break;
         }
     }
-    return 0.0;
+    if (chunk_ix >= (int)vmafs_.size()) {
+        chunk_ix = chunk_ix % vmafs_.size();
+    }
+    DLOG(INFO) << "VMAF score for chunk " << chunk_ix << ", bitrate " << bitrate << " (index " << br_ix << ") = " << vmafs_[chunk_ix][br_ix];
+    return vmafs_[chunk_ix][br_ix];    
+}
+
+double Video::avg_vmaf_for_bitrate(int bitrate) {
+    size_t br_ix = 0;
+    for (size_t i = 0; i < bitrates_.size(); i++) {
+        if ((int)bitrates_[i] == bitrate) {
+            br_ix = i;
+            break;
+        }
+    }
+    return vmaf_avgs_[br_ix];
 }
 
 double Video::vmaf_qoe(int chunk_ix, double rate) {
@@ -136,15 +153,29 @@ double Video::vmaf_qoe(int chunk_ix, double rate) {
 
 void Video::set_vmaf_file(std::string fname) {
 	std::ifstream f(fname);
-	std::string t;
+    std::string t;
 
+    DLOG(INFO) << "Reading VMAFs from " << fname;
 	while(getline(f, t)) {
-		vmafs_.push_back(string2vec(t));
+        vmafs_.push_back(string2vec(t));
 	}
+    // Compute averages
+    vmaf_avgs_.resize(vmafs_[0].size());
+    for (size_t i = 0; i < vmaf_avgs_.size(); i++) {
+        vmaf_avgs_[i] = 0;
+    }
+    for (size_t i = 0; i < vmafs_.size(); i++) {
+        for (size_t j = 0; j < vmafs_[i].size(); j++) {
+            vmaf_avgs_[j] += vmafs_[i][j] / vmafs_.size();
+        }
+    }
 }
 
 void Video::set_fit_file(std::string fname) {
 	std::ifstream f(fname);
+    if (!f.good()) {
+        return;
+    }
 	std::string t;
 
 	while(getline(f, t)) {

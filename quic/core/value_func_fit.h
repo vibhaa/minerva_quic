@@ -7,12 +7,14 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <array>
 
 #include "base/macros.h"
 #include "net/quic/core/value_func.h"
 #include "net/quic/platform/api/quic_export.h"
 
 using std::vector;
+using std::array;
 using std::string;
 using std::ifstream;
 using std::map;
@@ -26,20 +28,26 @@ class QUIC_EXPORT_PRIVATE ValueFuncFit : public ValueFunc {
   ~ValueFuncFit() override;
 
   // Expects the buffer in seconds, rate in Mbits/sec.
-  double ValueFor(double buffer, double rate, int prev_bitrate) override;
+  double ValueFor(size_t chunk_ix, double buffer, double rate, int prev_bitrate) override;
   int Horizon() override;
   string ArrToString(vector<double> arr) override;
 
  private:
   void ParseFrom(const string& filename);
   vector<double> ParseArray(ifstream *file);
-
+  
+  const static size_t NUM_FIT_PARAMS = 3;
   bool parsed_;
   int horizon_;
+  size_t num_chunks_;
   vector<double> buffers_;
   vector<double> rates_;
   vector<int> bitrates_;
-  vector<vector<vector<double>>> values_;
+  // First dim: chunk index
+  // Second dim: rate
+  // Third dim: previous bitrate
+  // Fourth dim: 3 fit parameters
+  vector<vector<vector<array<float, NUM_FIT_PARAMS>>>> values_;
   // Inverse map from bitrate to index in bitrates_;
   map<int, int> br_inverse_;
 };

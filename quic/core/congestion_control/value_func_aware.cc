@@ -57,10 +57,10 @@ ValueFuncAware::ValueFuncAware(
       last_time_(QuicWallTime::Zero()),
       multiplier_(1.0),
       rate_ewma_(-1),
+      rate_ewma2_(-1),
       rate_inst_(0),
       last_weight_update_time_(clock->WallNow()),
-      rate_measurement_interval_(QuicTime::Delta::FromMilliseconds(1000)),
-      weight_update_horizon_(QuicTime::Delta::FromMilliseconds(1000)),
+      rate_measurement_interval_(QuicTime::Delta::FromMilliseconds(500)),
       start_time_(clock->WallNow()),
       last_multiplier_update_(clock->WallNow()),
       transport_(transport),
@@ -287,28 +287,38 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     rate_ewma_ = (int64_t)(rate_ewma_factor * real_rate.ToBitsPerSecond() + (1 - rate_ewma_factor) * rate_ewma_);
     rate = QuicBandwidth::FromBitsPerSecond(rate_ewma_);*/
    
-    double rate_ewma_factor = 0.3;
+    double rate_ewma_factor = 0.1;
+    double rate_ewma2_factor = 0.25;
     QuicBandwidth rate = client_data_->get_latest_rate_estimate();
+    QuicBandwidth cons_rate = client_data_->get_conservative_rate_estimate();
     if (rate_ewma_ < 0) {
         rate_ewma_ = rate.ToBitsPerSecond();
+        rate_ewma2_ = rate.ToBitsPerSecond();
     }
+    //rate_ewma_ = rate.ToBitsPerSecond() * rate_ewma_factor + (1 - rate_ewma_factor)*rate_ewma_;
     rate_ewma_ = rate.ToBitsPerSecond() * rate_ewma_factor + (1 - rate_ewma_factor)*rate_ewma_;
+    rate_ewma2_ = cons_rate.ToBitsPerSecond() * rate_ewma2_factor + (1 - rate_ewma2_factor)*rate_ewma2_;
     rate_inst_ = rate.ToBitsPerSecond();
-    DLOG(INFO) << "Measured rate to be " << rate.ToDebugValue();
+    DLOG(INFO) << "Measured rate to be " << rate.ToDebugValue() << ", conservative rate is " << cons_rate.ToDebugValue();
     double utility;
     double adjusted_utility;
     bool prop_fairness = (client_data_->opt_target() == ClientData::OptTarget::propfair); // EXPERIMENTAL!
     bool needs_deriv = (client_data_->opt_target() == ClientData::OptTarget::propfair ||
             client_data_->opt_target() == ClientData::OptTarget::sum);
     DLOG(INFO) << "Optimization target is prop fairness? " << prop_fairness;
+    rate = cons_rate;
 
-    float mult_ewma = 0.3;
+    float mult_ewma = 0.2;
     if (!needs_deriv) {
         utility = client_data_->average_expected_qoe(rate);
+        adjusted_utility = utility;
         if (utility > 30) {
             adjusted_utility = 30.0;
         }
-        adjusted_utility = log(1 + exp(utility));
+        if (utility < -100) {
+            adjusted_utility = -100;
+        }
+        //adjusted_utility = log(1 + exp(utility));
     }
     else {
         /*
@@ -355,16 +365,13 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     value_ = adjusted_utility;
 
     double target;
-    if (adjusted_utility == 0) {
-        adjusted_utility = 0.1;
-    }
     //adjusted_value_ = adjusted_utility; //(adjusted_utility*adjusted_utility/20.0 + 1)/10.0;
     DLOG(INFO) << "before normalizing utility";
     adjusted_value_ = client_data_->normalize_utility(adjusted_utility);
     DLOG(INFO) << "after normalizing utility";
     if (client_data_->get_chunk_index() >= 1) {
         // The Cubic inverse is in Mbps. Convert to Kbps.
-        target = rate.ToKBitsPerSecond()/(1000.0 * (adjusted_value_));
+        target = (rate_ewma_ / 1000.0) /(1000.0 * (adjusted_value_));
     } else {
         target = 1;
     }
@@ -398,6 +405,9 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     // UNCOMMENT BELOW TO SET MAX WEIGHT.
     //multiplier_ = fmax(fmin(multiplier_, max_weight_), 1);
     SetWeight(multiplier_);
+    if (transport_ == transFast) {
+        UpdateCwndFastTCP();
+    }
     last_multiplier_update_ = clock_->WallNow();
 }
 
@@ -447,7 +457,7 @@ unsigned long ValueFuncAware::GetCwndEBCC() {
 
 void ValueFuncAware::UpdateCwndFastTCP() {
     // If we're aiming for an average of 2 cubic flows per video flow, there will be 20 packets in the queue per flow on average.
-    double target = 5 * weight_;
+    double target = 5 * multiplier_;
     double gamma = 0.8;
     double minrtt = rtt_stats_->min_rtt().ToMilliseconds();
     double new_wnd = (minrtt / rtt_stats_->latest_rtt().ToMilliseconds()) * congestion_window_ +
@@ -528,7 +538,6 @@ void ValueFuncAware::MaybeIncreaseCwnd(
    ++num_acked_packets_;
   // Congestion avoidance.
   if (transport_ == transFast) {
-      UpdateCwndFastTCP();
       return;
   } else if (transport_ == transReno) {
     // Classic Reno congestion avoidance.
