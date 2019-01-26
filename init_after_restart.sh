@@ -21,4 +21,4 @@ then
     echo "Copying videos. This will take some more time..."
     cp -r ~/efs/all_quic_data ~/all_quic_data
 fi
-
+cp ~/all_quic_data/dashHttps.all.min.js /tmp/quic-data/www.example3.org
