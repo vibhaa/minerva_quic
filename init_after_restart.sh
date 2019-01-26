@@ -19,6 +19,6 @@ echo "Copying QUIC server data from NFS"
 if [ ! -d "~/all_quic_data" ];
 then
     echo "Copying videos. This will take some more time..."
-    cp ~/efs/all_quic_data ~/all_quic_data
+    cp -r ~/efs/all_quic_data ~/all_quic_data
 fi
 
