@@ -402,9 +402,6 @@ double ClientData::average_expected_qoe(QuicBandwidth rate) {
     double buf = get_buffer_estimate();
     // Adjust the buffer for dash.
     buf -= 0.6;
-    if (get_chunk_index() < 5) {
-        buf = 20;
-    }
     double rebuf_time = 100.0;
     if (rate.ToBytesPerSecond() > 0) { 
         buf -= ((double)cs)/rate.ToBytesPerSecond();
@@ -414,7 +411,8 @@ double ClientData::average_expected_qoe(QuicBandwidth rate) {
             rebuf_time = 0.0;
         }
     }
-    DLOG(INFO) << "Chunk remainder (bytes) = " << cs
+    DLOG(INFO) << "Video " << get_vid_prefix()
+        << ": Chunk remainder (bytes) = " << cs
         << ", buffer = " << buf
         << ", ss = " << get_screen_size()
         << ", chunk_ix = " << get_chunk_index()
@@ -430,32 +428,33 @@ double ClientData::average_expected_qoe(QuicBandwidth rate) {
     value /= get_value_func()->Horizon();
     DLOG(INFO) << "Average future per chunk value is " << value;
     int num_past_recorded_chunks = past_qoes_.size();
-    double past_qoe_weight = 0.0; //fmin(10, num_past_recorded_chunks);
-    double cur_chunk_weight = 2.0;
+    double past_qoe_weight = fmin(5.0, num_past_recorded_chunks);
+    double cur_chunk_weight = 5.0;
     double value_weight = get_value_func()->Horizon();
     double avg_est_qoe = value * value_weight;
     double total_weight = value_weight;
-    if (num_past_recorded_chunks > (int)past_qoe_weight) {
+    if (num_past_recorded_chunks > 0) {
         avg_est_qoe += (get_past_qoe()) * past_qoe_weight/(num_past_recorded_chunks);
-        total_weight += past_qoe_weight;
-        avg_est_qoe += cur_qoe * cur_chunk_weight;
-        total_weight += cur_chunk_weight;
-        DLOG(INFO) << "qoe = " << value * value_weight << " (" << value_weight << ") + "
-            << get_past_qoe() / num_past_recorded_chunks << " (" << past_qoe_weight << ") + "
-            << cur_qoe << " (" << cur_chunk_weight << ") = " << avg_est_qoe << " (total weight = " << total_weight << ")";
-    } else {
-        // Phase in the contributions from past QoE and current chunk over the first 10 chunks.
-        // If they're introduced too quickly / all at once, the multiplier will spike.
-        DLOG(INFO) << "CASE WHERE num_recorded_chunks = 0: past_qoe = " << get_past_qoe();
-        avg_est_qoe += cur_qoe + get_past_qoe();
-        total_weight += cur_chunk_weight + num_past_recorded_chunks;
-        avg_est_qoe += value * (10 - num_past_recorded_chunks);
-        total_weight += 10 - num_past_recorded_chunks;
-        /*avg_est_qoe += value * (past_qoe_weight - num_past_recorded_chunks) + get_past_qoe();
-        total_weight += past_qoe_weight;
-        avg_est_qoe += past_qoe_weight * cur_qoe / 10;
-        total_weight += past_qoe_weight / 10;*/
     }
+    total_weight += past_qoe_weight;
+    avg_est_qoe += cur_qoe * cur_chunk_weight;
+    total_weight += cur_chunk_weight;
+    DLOG(INFO) << "qoe = " << value * value_weight << " (" << value_weight << ") + "
+        << get_past_qoe() / num_past_recorded_chunks << " (" << past_qoe_weight << ") + "
+        << cur_qoe << " (" << cur_chunk_weight << ") = " << avg_est_qoe << " (total weight = " << total_weight << ")";
+    //else {
+    //    // Phase in the contributions from past QoE and current chunk over the first 10 chunks.
+    //    // If they're introduced too quickly / all at once, the multiplier will spike.
+    //    DLOG(INFO) << "CASE WHERE num_recorded_chunks = 0: past_qoe = " << get_past_qoe();
+    //    avg_est_qoe += cur_qoe + get_past_qoe();
+    //    total_weight += cur_chunk_weight + num_past_recorded_chunks;
+    //    avg_est_qoe += value * (10 - num_past_recorded_chunks);
+    //    total_weight += 10 - num_past_recorded_chunks;
+    //    /*avg_est_qoe += value * (past_qoe_weight - num_past_recorded_chunks) + get_past_qoe();
+    //    total_weight += past_qoe_weight;
+    //    avg_est_qoe += past_qoe_weight * cur_qoe / 10;
+    //    total_weight += past_qoe_weight / 10;*/
+    //}
     avg_est_qoe /= total_weight;
     DLOG(INFO) << "Past qoe = " << get_past_qoe()
         << ", num qoe chunks = " << num_past_recorded_chunks

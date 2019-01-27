@@ -199,6 +199,7 @@ void TcpCubicSenderBytes::MaybeIncreaseCwnd(
                    << ", \"clientId\": " << client_data_->get_client_id()
                    << ", \"bandwidth_Mbps\": " << client_data_->get_latest_rate_estimate().ToKBitsPerSecond()/1000.0
                    << ", \"congestion_window\": "<< congestion_window_
+                   << ", \"videoFile\": \"" << client_data_->get_vid_prefix() << "\""
                    << ", \"screen_size\": " << ss
                    << "}\n";
     }

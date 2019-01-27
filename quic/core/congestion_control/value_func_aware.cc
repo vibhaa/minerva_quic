@@ -288,12 +288,12 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     rate = QuicBandwidth::FromBitsPerSecond(rate_ewma_);*/
    
     double rate_ewma_factor = 0.1;
-    double rate_ewma2_factor = 0.25;
+    double rate_ewma2_factor = 0.2;
     QuicBandwidth rate = client_data_->get_latest_rate_estimate();
     QuicBandwidth cons_rate = client_data_->get_conservative_rate_estimate();
     if (rate_ewma_ < 0) {
         rate_ewma_ = rate.ToBitsPerSecond();
-        rate_ewma2_ = rate.ToBitsPerSecond();
+        rate_ewma2_ = cons_rate.ToBitsPerSecond();
     }
     //rate_ewma_ = rate.ToBitsPerSecond() * rate_ewma_factor + (1 - rate_ewma_factor)*rate_ewma_;
     rate_ewma_ = rate.ToBitsPerSecond() * rate_ewma_factor + (1 - rate_ewma_factor)*rate_ewma_;
@@ -306,9 +306,9 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     bool needs_deriv = (client_data_->opt_target() == ClientData::OptTarget::propfair ||
             client_data_->opt_target() == ClientData::OptTarget::sum);
     DLOG(INFO) << "Optimization target is prop fairness? " << prop_fairness;
-    rate = cons_rate;
+    rate = cons_rate; //QuicBandwidth::FromBitsPerSecond(rate_ewma2_);
 
-    float mult_ewma = 0.2;
+    float mult_ewma = 0.1;
     if (!needs_deriv) {
         utility = client_data_->average_expected_qoe(rate);
         adjusted_utility = utility;
@@ -384,23 +384,24 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     // Correction to deal with cubic not respecting ratios well
     // Another possibility to try is to inflate the measured rate but normalize with the real one?.
     if (needs_deriv)
-        target = 0.83 * target;
+        target = 0.8 * target;
     else
-        target = 0.83 * target;
-    DLOG(INFO) << "Adjusted target = " << target;
+        target = 0.8 * target;
 
     // The mult_ewma factor is determined by the kind of fairness (maxmin, sum, etc).
     // TODO(vikram): move to Trim().
-    multiplier_ = mult_ewma * target + (1 - mult_ewma) * multiplier_;
+    double upper_bound = fmin(multiplier_ * 2, 20.0);
     if (max_weight_ > 0) {
-        multiplier_ = fmax(fmin(multiplier_, 5.0), 1.0);
+        target = fmax(fmin(multiplier_, 5.0), 1.0);
     } else {
-        multiplier_ = fmax(fmin(multiplier_, 20.0), 0.5);
+        target = fmax(fmin(target, upper_bound), 0.5);
     }
     if (isOption(MAX_WEIGHT)){
       multiplier_ = ReadMaxWeight();
     }
+    DLOG(INFO) << "Adjusted target = " << target;
 
+    multiplier_ = mult_ewma * target + (1 - mult_ewma) * multiplier_;
     DLOG(INFO) << "Got multiplier " << multiplier_;
     // UNCOMMENT BELOW TO SET MAX WEIGHT.
     //multiplier_ = fmax(fmin(multiplier_, max_weight_), 1);
@@ -488,7 +489,7 @@ void ValueFuncAware::MaybeIncreaseCwnd(
   if (client_data_ != nullptr) {
       client_data_->set_bw_measurement_interval(rate_measurement_interval_);
       if (!bw_log_file_.is_open()) {
-          std::string filename = "quic_bw_vf_fast_" + std::to_string(client_data_->get_client_id()) + ".log";
+          std::string filename = "quic_bw_vf_fast_" + std::to_string(int(client_data_->get_client_id())) + ".log";
           bw_log_file_.open(filename, std::ios::trunc);
       }
       double ss = client_data_->get_screen_size();
@@ -506,6 +507,7 @@ void ValueFuncAware::MaybeIncreaseCwnd(
                      << ", \"congestion_window\": "<< congestion_window_
                      << ", \"latest_rtt\": " << rtt_stats_->latest_rtt().ToMilliseconds()
                      << ", \"screen_size\": " << ss
+                     << ", \"videoFile\": \"" << client_data_->get_vid_prefix() << "\""
                      << ", \"multiplier\": " << multiplier_
                      << ", \"value\": " << value_
                      << ", \"adjusted_value\": " << adjusted_value_
