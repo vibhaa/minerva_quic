@@ -15,7 +15,6 @@
 #include "net/quic/core/congestion_control/send_algorithm_interface.h"
 #include "net/quic/core/congestion_control/windowed_filter.h"
 #include "net/quic/core/crypto/quic_random.h"
-#include "net/quic/core/client_data.h"
 #include "net/quic/core/quic_bandwidth.h"
 #include "net/quic/core/quic_packets.h"
 #include "net/quic/core/quic_time.h"
@@ -103,7 +102,6 @@ class QUIC_EXPORT_PRIVATE BbrSender : public SendAlgorithmInterface {
   bool InRecovery() const override;
   bool IsProbingForMoreBandwidth() const override;
 
-  double GetPacingGain(int cycle_offset) const;
   void SetFromConfig(const QuicConfig& config,
                      Perspective perspective) override;
 
@@ -219,8 +217,6 @@ class QUIC_EXPORT_PRIVATE BbrSender : public SendAlgorithmInterface {
   void CalculateRecoveryWindow(QuicByteCount bytes_acked,
                                QuicByteCount bytes_lost);
 
-  void WriteStatsToFile();
-
   const RttStats* rtt_stats_;
   const QuicUnackedPacketMap* unacked_packets_;
   QuicRandom* random_;
@@ -285,7 +281,7 @@ class QUIC_EXPORT_PRIVATE BbrSender : public SendAlgorithmInterface {
 
   // The gain used for the congestion window during PROBE_BW.  Latched from
   // quic_bbr_cwnd_gain flag.
-  float congestion_window_gain_constant_;
+  const float congestion_window_gain_constant_;
   // The coefficient by which mean RTT variance is added to the congestion
   // window.  Latched from quic_bbr_rtt_variation_weight flag.
   const float rtt_variance_weight_;
@@ -356,22 +352,11 @@ class QUIC_EXPORT_PRIVATE BbrSender : public SendAlgorithmInterface {
   // app limited.
   bool probe_rtt_disabled_if_app_limited_;
   bool app_limited_since_last_probe_rtt_;
-  
+  ClientData* client_data_;
   // last time when window was recorded
   QuicWallTime last_time_;
   QuicTime::Delta min_rtt_since_last_probe_rtt_;
-  
-  ClientData* client_data_;
-  // Handle of the log file we write to, so we don't reopen the file
-  // on every ack that we get.
-  std::ofstream bw_log_file_;
-  
-  // The measured bandwidth
-  double bw_ewma_;
-  bool new_bw_measurement_ready_;
-  double value_;
-  double adjusted_value_;
-  double multiplier_;
+
   DISALLOW_COPY_AND_ASSIGN(BbrSender);
 };
 

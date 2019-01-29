@@ -135,19 +135,13 @@ BbrSender::DebugState::DebugState(const DebugState& state) = default;
       probe_rtt_skipped_if_similar_rtt_(false),
       probe_rtt_disabled_if_app_limited_(false),
       app_limited_since_last_probe_rtt_(false),
-      last_time_(QuicWallTime::Zero()),
-      min_rtt_since_last_probe_rtt_(QuicTime::Delta::Infinite()),
       client_data_(nullptr),
-      bw_log_file_(),
-      bw_ewma_(0.0),
-      new_bw_measurement_ready_(false) {
+      last_time_(QuicWallTime::Zero()),
+      min_rtt_since_last_probe_rtt_(QuicTime::Delta::Infinite()) {
   EnterStartupMode();
 }
 
-BbrSender::~BbrSender() {
-    bw_log_file_.close();
-    delete client_data_;
-}
+BbrSender::~BbrSender() {}
 
 void BbrSender::SetAuxiliaryClientData(ClientData* cdata) {
     client_data_ = cdata;
@@ -157,38 +151,29 @@ bool BbrSender::InSlowStart() const {
   return mode_ == STARTUP;
 }
 
-void BbrSender::WriteStatsToFile() {
-  double ss = client_data_->get_screen_size();
-  QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_time_);
-  if (ss > 0 && time_elapsed > rtt_stats_->smoothed_rtt()) { 
-        if (!bw_log_file_.is_open()) {
-            std::string filename = "quic_bw_bbr_" + std::to_string(client_data_->get_client_id()) + ".log";
-            bw_log_file_.open(filename, std::ios::trunc);
-        }
-        last_time_ = clock_->WallNow();
-        bw_log_file_ << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
-                 << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
-                 << ", \"clientId\": " << client_data_->get_client_id()
-                 << ", \"bandwidth_Mbps\": " << client_data_->get_latest_rate_estimate().ToKBitsPerSecond()/1000.0
-                 << ", \"congestion_window\": "<< GetCongestionWindow()
-                 << ", \"screen_size\": " << ss
-                 << ", \"value\": " << value_
-                 << ", \"adjusted_value\": " << adjusted_value_
-                 << ", \"multiplier\": " << multiplier_
-                 << ", \"rate_ewma\": " << bw_ewma_
-                 << "}\n";
-  }
-  
-}
-
 void BbrSender::OnPacketSent(QuicTime sent_time,
                              QuicByteCount bytes_in_flight,
                              QuicPacketNumber packet_number,
                              QuicByteCount bytes,
                              HasRetransmittableData is_retransmittable) {
   last_sent_packet_ = packet_number;
-  WriteStatsToFile();
 
+  std::ofstream bw_log_file;
+  bw_log_file.open("quic_bw_bbr.log", std::ios::app);
+  double ss = client_data_->get_screen_size();
+  QuicTime::Delta time_elapsed = clock_->WallNow().AbsoluteDifference(last_time_);
+  if (ss > 0 && time_elapsed > rtt_stats_->smoothed_rtt()) { 
+        last_time_ = clock_->WallNow();
+        bw_log_file << "{\"chunk_download_start_walltime_sec\": " << std::fixed << std::setprecision(3) 
+                 << clock_->WallNow().AbsoluteDifference(QuicWallTime::Zero()).ToMicroseconds()/1000.0
+                 << ", \"clientId\": " << client_data_->get_client_id()
+                 << ", \"bandwidth_Mbps\": " << client_data_->get_latest_rate_estimate().ToKBitsPerSecond()/1000.0
+                 << ", \"congestion_window\": "<< GetCongestionWindow()
+                 << ", \"screen_size\": " << ss
+                 << "}\n";
+  }
+  bw_log_file.close();
+  
   if (bytes_in_flight == 0 && sampler_->is_app_limited()) {
     exiting_quiescence_ = true;
   }
@@ -240,17 +225,6 @@ bool BbrSender::InRecovery() const {
 
 bool BbrSender::IsProbingForMoreBandwidth() const {
   return (mode_ == PROBE_BW && pacing_gain_ > 1) || mode_ == STARTUP;
-}
-
-double BbrSender::GetPacingGain(int cycle_offset) const {
-    if (client_data_ == nullptr || cycle_offset > 0) {
-        return kPacingGain[cycle_offset];
-    }
-    //int ss = client_data_->get_screen_size();
-    //if (ss > 1.5) {
-    //    return 2*(kPacingGain[cycle_offset]-1) + 1;
-    //}
-    return kPacingGain[cycle_offset];
 }
 
 void BbrSender::SetFromConfig(const QuicConfig& config,
@@ -450,27 +424,7 @@ void BbrSender::EnterStartupMode() {
 
 void BbrSender::EnterProbeBandwidthMode(QuicTime now) {
   mode_ = PROBE_BW;
-
-  QuicBandwidth rate = client_data_->get_conservative_rate_estimate();
-  double qoe = client_data_->average_expected_qoe(
-          QuicBandwidth::FromKBitsPerSecond(bw_ewma_));
-  qoe = fmin(qoe, 30);
-  // Take a softplus function to remove negative values.
-  qoe = log(1 + exp(qoe));
-  value_ = qoe;
-  adjusted_value_ = client_data_->normalize_utility(qoe);
-  double target_weight = 2.0;
-  if (client_data_->get_chunk_index() >= 1) {
-      target_weight = rate.ToKBitsPerSecond() / (1000.0 * adjusted_value_);
-  }
-  // Scale so that the average is 3 instead of 2.
-  target_weight *= 3.0/2.0;
-  // Cap within [1, 5] and map a weight of 1 to a gain of 1.2.
-  target_weight = 1.2 * fmin(fmax(target_weight, 1.0), 5.0);
-  multiplier_ = target_weight;
-
-  congestion_window_gain_ = target_weight;
-  
+  congestion_window_gain_ = congestion_window_gain_constant_;
 
   // Pick a random offset for the gain cycle out of {0, 2..7} range. 1 is
   // excluded because in that case increased gain and decreased gain would not
@@ -481,7 +435,7 @@ void BbrSender::EnterProbeBandwidthMode(QuicTime now) {
   }
 
   last_cycle_start_ = now;
-  pacing_gain_ = GetPacingGain(cycle_current_offset_);
+  pacing_gain_ = kPacingGain[cycle_current_offset_];
 }
 
 void BbrSender::DiscardLostPackets(const LostPacketVector& lost_packets) {
@@ -504,15 +458,9 @@ bool BbrSender::UpdateBandwidthAndMinRtt(
     QuicTime now,
     const AckedPacketVector& acked_packets) {
   QuicTime::Delta sample_min_rtt = QuicTime::Delta::Infinite();
-  double bw_ewma_factor = 0.1;
   for (const auto& packet : acked_packets) {
     BandwidthSample bandwidth_sample =
         sampler_->OnPacketAcknowledged(now, packet.packet_number);
-    bool ready = client_data_->record_acked_bytes(packet.bytes_acked);
-    new_bw_measurement_ready_ = new_bw_measurement_ready_ || ready;
-    
-    bw_ewma_ = bw_ewma_factor * bandwidth_sample.bandwidth.ToKBitsPerSecond() + (1 - bw_ewma_factor) * bw_ewma_;
-    
     last_sample_is_app_limited_ = bandwidth_sample.is_app_limited;
     if (!bandwidth_sample.rtt.IsZero()) {
       sample_min_rtt = std::min(sample_min_rtt, bandwidth_sample.rtt);
@@ -601,11 +549,11 @@ void BbrSender::UpdateGainCyclePhase(QuicTime now,
     // Stay in low gain mode until the target BDP is hit.
     // Low gain mode will be exited immediately when the target BDP is achieved.
     if (fully_drain_queue_ && pacing_gain_ < 1 &&
-        GetPacingGain(cycle_current_offset_) == 1 &&
+        kPacingGain[cycle_current_offset_] == 1 &&
         prior_in_flight > GetTargetCongestionWindow(1)) {
       return;
     }
-    pacing_gain_ = GetPacingGain(cycle_current_offset_);
+    pacing_gain_ = kPacingGain[cycle_current_offset_];
   }
 }
 
