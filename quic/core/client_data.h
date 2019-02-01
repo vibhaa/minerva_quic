@@ -93,6 +93,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
 
   double average_expected_qoe(QuicBandwidth cur_rate);
   double generic_fn_inverse(const std::vector<std::vector<double>>& table, double arg);
+  bool is_value_func_loaded();
   void init_cubic_inverse();
   float normalize_utility(float arg);
   //double compute_cubic_inverse(double arg);
@@ -136,7 +137,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   OptTarget opt_target_;
   double past_avg_br_;
   double past_deriv_;
-
+  bool value_func_loaded_;
   // If we're optimizing for max-min fairness, this is the `inverse function' we use
   // so that the average multiplier is equal to TCP's multiplier when in the steady state.  
   FunctionTable maxmin_util_inverse_fn_;

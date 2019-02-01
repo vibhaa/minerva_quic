@@ -48,10 +48,9 @@ size_t ValueFuncInterp::FindBinarySearch(vector<float> values, size_t min_ix, si
 
 double ValueFuncInterp::ValueForParams(double buffer, const vector<vector<float>>& params) {
     DLOG(INFO) << "Binary search on size " << params[0].size();
-    double maxbuf = 100;
     double maxval = params[1][params[1].size() - 1];
     size_t ix;
-    if (buffer >= maxbuf) {
+    if (buffer >= params[0][params[0].size() - 1]) {
         ix = params[0].size() - 1;
     } else {
         ix = FindBinarySearch(params[0], 0, params[0].size()-1, buffer);

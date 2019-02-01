@@ -45,6 +45,7 @@ ClientData::ClientData(const QuicClock* clock)
       opt_target_(),
       past_avg_br_(0.0),
       past_deriv_(0.0),
+      value_func_loaded_(false),
       maxmin_util_inverse_fn_(),
       sum_util_inverse_fn_() {
       }
@@ -241,6 +242,11 @@ void ClientData::load_value_function(const std::string& filename) {
             value_func_ = new ValueFuncRaw(filename);
             break;
     }
+    value_func_loaded_ = true;
+}
+
+bool ClientData::is_value_func_loaded() {
+    return value_func_loaded_;
 }
 
 ValueFunc* ClientData::get_value_func() {
