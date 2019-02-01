@@ -55,7 +55,7 @@ ValueFuncAware::ValueFuncAware(
       min_slow_start_exit_window_(min_congestion_window_),
       client_data_(nullptr),
       last_time_(QuicWallTime::Zero()),
-      multiplier_(1.0),
+      multiplier_(2.0),
       rate_ewma_(-1),
       rate_ewma2_(-1),
       rate_inst_(0),
@@ -65,7 +65,8 @@ ValueFuncAware::ValueFuncAware(
       last_multiplier_update_(clock->WallNow()),
       transport_(transport),
       bw_log_file_(),
-      max_weight_(5.0),
+      max_weight_(-1.0),
+      min_weight_(-1.0),
       value_(0.0),
       adjusted_value_(0.0),
       cubic_utility_fn_(10, std::vector<double>(2)),
@@ -149,19 +150,22 @@ bool ValueFuncAware::isOption(std::string s) {
 void ValueFuncAware::ReadArgs() {
   std::ifstream f("/tmp/quic-max-val.txt");
   max_weight_ = -1.0;
-  if (!f.good()) {
-      return;
-  }
-  std::string t;
-  while(f >> t) {
-    double weight = std::stod(t);
-    if (weight > 0) {
-        max_weight_ = 5.0;
-        DLOG(INFO) << "Bounding max weight to 5.0";
+  if (f.good()) {
+    std::string t;
+    while(f >> t) {
+      double weight = std::stod(t);
+      if (weight > 0) {
+          max_weight_ = weight;
+          min_weight_ = fmax(0.1, 4 - weight);
+          break;
+          DLOG(INFO) << "Bounding max weight to " << weight;
+      }
     }
   }
+
   std::ifstream f2("/tmp/quic-args.txt");
   if (!f2.good())return;
+  std::string t;
   while(f2 >> t) {
     read_options.push_back(t);
   }
@@ -170,7 +174,7 @@ void ValueFuncAware::ReadArgs() {
 double ValueFuncAware::ReadMaxWeight() {
   std::string t;
   if (client_data_ -> get_screen_size() > 1) {
-    std::ifstream f2("/tmp/quic-max-val.txt");
+    std::ifstream f2("/tmp/quic-max-val-deprecated.txt");
     while(f2 >> t) {
       double weight = std::stod(t);
       if (weight > 0) {
@@ -373,7 +377,7 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         // The Cubic inverse is in Mbps. Convert to Kbps.
         target = (rate_ewma_ / 1000.0) /(1000.0 * (adjusted_value_));
     } else {
-        target = 1;
+        target = 2;
     }
     DLOG(INFO) << "Utility = " << utility
         << ", adjusted avg utility w/ sigmoid = " << adjusted_utility
@@ -391,14 +395,14 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     // The mult_ewma factor is determined by the kind of fairness (maxmin, sum, etc).
     // TODO(vikram): move to Trim().
     double upper_bound = fmin(multiplier_ * 2, 20.0);
-    if (max_weight_ > 0) {
-        target = fmax(fmin(multiplier_, 5.0), 1.0);
-    } else {
-        target = fmax(fmin(target, upper_bound), 0.5);
+    double lower_bound = 0.5;
+    if (max_weight_ > 0){
+        upper_bound = fmin(upper_bound, max_weight_);
     }
-    if (isOption(MAX_WEIGHT)){
-      multiplier_ = ReadMaxWeight();
+    if (min_weight_ > 0){
+        lower_bound = min_weight_;
     }
+    target = fmax(fmin(target, upper_bound), lower_bound);
     DLOG(INFO) << "Adjusted target = " << target;
 
     multiplier_ = mult_ewma * target + (1 - mult_ewma) * multiplier_;

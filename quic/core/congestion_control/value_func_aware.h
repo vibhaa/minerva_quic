@@ -146,6 +146,7 @@ class QUIC_EXPORT_PRIVATE ValueFuncAware : public TcpCubicSenderBase {
 
   // maximum weight to use (Weight's capped at this)
   double max_weight_;
+  double min_weight_;
 
   // value computed at each update
   double value_;
