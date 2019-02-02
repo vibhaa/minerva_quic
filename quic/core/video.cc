@@ -107,7 +107,7 @@ double Video::vmaf_for_chunk(int chunk_ix, int bitrate) {
         chunk_ix = chunk_ix % vmafs_.size();
     }
     DLOG(INFO) << "VMAF score for chunk " << chunk_ix << ", bitrate " << bitrate << " (index " << br_ix << ") = " << vmafs_[chunk_ix][br_ix];
-    return vmafs_[chunk_ix][br_ix];    
+    return vmafs_[chunk_ix][br_ix] / 5;    
 }
 
 double Video::avg_vmaf_for_bitrate(int bitrate) {
@@ -119,6 +119,38 @@ double Video::avg_vmaf_for_bitrate(int bitrate) {
         }
     }
     return vmaf_avgs_[br_ix];
+}
+
+// Rate should be in kbps
+double Video::vmaf_deriv_for_rate(double rate) {
+    size_t ix = 0;
+    while (ix < bitrates_.size() && rate > bitrates_[ix]) {
+        ix++;
+    }
+    // vmaf_derivs_ has an extra entry at 0.
+    if (ix == 0) {
+        return vmaf_derivs_[0];
+    }
+    double frac = (rate - bitrates_[ix-1])/(bitrates_[ix] - bitrates_[ix-1]);
+    return frac * vmaf_derivs_[ix] + (1-frac)*vmaf_derivs_[ix-1];
+}
+
+double Video::inverse_vmaf(double util) {
+    // Since the utility is on a scale of 20 instead of 100.
+    size_t ix = 0;
+    while (ix < vmaf_avgs_.size() && util > vmaf_avgs_[ix]) {
+        ix++;
+    }
+    // TODO(Vikram): Deal with rebuffering.
+    if (ix == 0) {
+        return bitrates_[0];
+    }
+    if (ix == vmaf_avgs_.size()) {
+        return bitrates_[bitrates_.size()-1];
+    }
+    // Interpolate between bitrates
+    double frac = (util - vmaf_avgs_[ix-1])/(vmaf_avgs_[ix] - vmaf_avgs_[ix-1]);
+    return frac * bitrates_[ix] + (1-frac)*bitrates_[ix-1];
 }
 
 double Video::vmaf_qoe(int chunk_ix, double rate) {
@@ -166,8 +198,27 @@ void Video::set_vmaf_file(std::string fname) {
     }
     for (size_t i = 0; i < vmafs_.size(); i++) {
         for (size_t j = 0; j < vmafs_[i].size(); j++) {
-            vmaf_avgs_[j] += vmafs_[i][j] / vmafs_.size();
+            vmaf_avgs_[j] += vmafs_[i][j] / (5 * vmafs_.size());
         }
+    }
+    for (size_t i = 0; i < vmaf_avgs_.size(); i++) {
+        DLOG(INFO) << "Avg VMAF for bitrate " << bitrates_[i] << " = " << vmaf_avgs_[i];
+    }
+
+    // Compute the derivative.
+    double theta1 = atan(1000 * (vmaf_avgs_[0] + 100) / bitrates_[0]);
+    vmaf_derivs_.push_back(100/0.3);
+    for (size_t i = 0; i < vmaf_avgs_.size() - 1; i++) {
+        double slope = 1000 * (vmaf_avgs_[i+1] - vmaf_avgs_[i]) / (bitrates_[i+1] - bitrates_[i]);
+        double theta2 = atan(slope);
+        double dd = (sin(theta2) + sin(theta1))/(cos(theta2) + cos(theta1));
+        vmaf_derivs_.push_back(dd);
+        theta1 = theta2;
+    }
+    double dd = sin(theta1) / (1 + cos(theta1));
+    vmaf_derivs_.push_back(dd); 
+    for (size_t i = 0; i < vmaf_avgs_.size(); i++) {
+        DLOG(INFO) << "VMAF deriv for bitrate " << bitrates_[i] << " = " << vmaf_derivs_[i];
     }
 }
 

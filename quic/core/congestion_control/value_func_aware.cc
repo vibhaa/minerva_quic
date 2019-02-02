@@ -313,7 +313,7 @@ void ValueFuncAware::UpdateCwndMultiplier() {
     rate = cons_rate; //QuicBandwidth::FromBitsPerSecond(rate_ewma2_);
 
     float mult_ewma = 0.1;
-    if (!needs_deriv) {
+    if (!prop_fairness) {
         utility = client_data_->average_expected_qoe(rate);
         adjusted_utility = utility;
         if (utility > 30) {
@@ -325,46 +325,7 @@ void ValueFuncAware::UpdateCwndMultiplier() {
         //adjusted_utility = log(1 + exp(utility));
     }
     else {
-        /*
-        QuicBandwidth rate_m1 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() - 100000);
-        //QuicBandwidth rate_m2 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() - 200000);
-        //QuicBandwidth rate_m3 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() - 300000);
-        //QuicBandwidth rate_m4 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() - 400000);
-        //QuicBandwidth rate_m5 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() - 500000);
-        QuicBandwidth rate_p1 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() + 100000);
-        //QuicBandwidth rate_p2 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() + 200000);
-        //QuicBandwidth rate_p3 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() + 300000);
-        //QuicBandwidth rate_p4 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() + 400000);
-        //QuicBandwidth rate_p5 = QuicBandwidth::FromBitsPerSecond(rate.ToBitsPerSecond() + 500000);
-        double q_p1 = client_data_->average_expected_qoe(rate_p1);
-        //double q_p2 = AverageExpectedQoe(rate_p2);
-        //double q_p3 = AverageExpectedQoe(rate_p3);
-        //double q_p4 = AverageExpectedQoe(rate_p4);
-        //double q_p5 = AverageExpectedQoe(rate_p5);
-        double q_m1 = client_data_->average_expected_qoe(rate_m1);
-        //double q_m2 = AverageExpectedQoe(rate_m2);
-        //double q_m3 = AverageExpectedQoe(rate_m3);
-        //double q_m4 = AverageExpectedQoe(rate_m4);
-        //double q_m5 = AverageExpectedQoe(rate_m5);
-        double d_utility1 = (q_p1 - q_m1)/0.2;
-        //double d_utility2 = (q_p2 - q_m2)/0.4;
-        //double d_utility3 = (q_p3 - q_m3)/0.6;
-        //double d_utility4 = (q_p4 - q_m4)/0.8;
-        //double d_utility5 = (q_p5 - q_m5)/1.0;
-        double d_utility = d_utility1; //(d_utility1 + d_utility2 + d_utility3 + d_utility4 + d_utility5) / 4;
-        */
-        double d_utility = client_data_->qoe_deriv(QuicBandwidth::FromBitsPerSecond(rate_ewma_));
-        DLOG(INFO) << "Derivative is " << d_utility; 
-        //float t = 10;
-        //d_utility = 1/t * log(1 + exp(t*d_utility));
-        if (prop_fairness) {
-            utility = client_data_->average_expected_qoe(rate) / d_utility;
-        } else {
-            utility = 4.0 - pow(log(d_utility), 0.5);
-        }
-        adjusted_utility = fmin(utility, 30);
-        // In practice, the derivative is less stable.
-        mult_ewma = 0.1;
+        adjusted_utility = client_data_->propfair_utility(rate);
     }
     value_ = adjusted_utility;
 

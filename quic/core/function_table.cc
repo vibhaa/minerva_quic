@@ -18,11 +18,6 @@ FunctionTable::FunctionTable(const std::string& filename)
 FunctionTable::~FunctionTable() {}
 
 size_t FunctionTable::IndexFor(float arg, size_t min_ix, size_t max_ix) const {
-    DLOG(INFO) << "In index for " 
-        << "arg =" << arg
-        << "min_ix =" << min_ix
-        << "max_ix =" << max_ix;
-
     if (max_ix - min_ix <= 1) {
         if (table_[max_ix].arg == arg) {
             return max_ix;

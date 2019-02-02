@@ -31,6 +31,8 @@ class Video {
   double vmaf_for_chunk(int chunk_ix, int bitrate);  
   //double qoe(int chunk_ix, double rate);// rate in Kbps
   double vmaf_qoe(int chunk_ix, double rate);
+  double inverse_vmaf(double util);
+  double vmaf_deriv_for_rate(double rate);
 
   std::vector<double> string2vec(std::string s);
   std::vector<double> get_bitrates();
@@ -46,6 +48,7 @@ class Video {
   std::vector< std::vector<double> > chunk_sizes_; // in Mb
   std::vector< std::vector<double> > vmafs_;
   std::vector<double> vmaf_avgs_;
+  std::vector<double> vmaf_derivs_;
   std::vector< double > fit_params;
 };
 

@@ -45,9 +45,7 @@ ClientData::ClientData(const QuicClock* clock)
       opt_target_(),
       past_avg_br_(0.0),
       past_deriv_(0.0),
-      value_func_loaded_(false),
-      maxmin_util_inverse_fn_(),
-      sum_util_inverse_fn_() {
+      util_inverse_fn_() {
       }
 
 ClientData::~ClientData() {
@@ -279,12 +277,12 @@ double ClientData::get_past_qoe() {
 
 double ClientData::utility_for_bitrate(int chunk_ix, int bitrate) {
     double q = vid_.vmaf_for_chunk(chunk_ix, bitrate);
-    return q/5.0;
+    return q;
 }
 
 double ClientData::average_utility_for_bitrate(int bitrate) {
     double q = vid_.avg_vmaf_for_bitrate(bitrate);
-    return q/5.0;
+    return q;
 }
 
 double ClientData::qoe(int bitrate, double rebuf, int prev_bitrate) {
@@ -392,11 +390,25 @@ void ClientData::set_vid_prefix(std::string f) {
   vid_prefix_ = f;
   vid_.set_vid_prefix(vid_prefix_);
 
-  if (vid_prefix_.find("Psnr") != std::string::npos){
-        maxmin_util_inverse_fn_ = FunctionTable(NORMALIZER_FN_DIR + "/TennisSeekingPsnrInverseAvg.fit");
-        sum_util_inverse_fn_ = FunctionTable(NORMALIZER_FN_DIR + "/TennisSeekingPsnrInverseDeriv.fit");
-  }
+}
 
+double ClientData::propfair_utility(QuicBandwidth rate) {
+    // Find the expected QoE. Then find the corresponding derivative
+    // at the same point on the VMAF curve (by first inverting VMAF to
+    // find the corresponding rate, then applying the derivative).
+    double util = average_expected_qoe(rate);
+    double repr_rate = vid_.inverse_vmaf(util);
+    double deriv = vid_.vmaf_deriv_for_rate(repr_rate);
+    double util_pos = util;
+    if (util_pos < 10) {
+        util_pos = log(1 + exp(util));
+    }
+    double mod = 10.0 - pow(fmax(0, deriv/util_pos), 0.2);
+    DLOG(INFO) << "For rate " << rate << ", got average util " << util
+        << ", modified positive util = " << util_pos
+        << ", repr_rate = " << repr_rate << ", deriv = " << deriv
+        << ", propfair util = " << mod;
+    return mod;
 }
 
 Video* ClientData::get_vid() {
@@ -439,6 +451,7 @@ double ClientData::average_expected_qoe(QuicBandwidth rate) {
     double value_weight = get_value_func()->Horizon();
     double avg_est_qoe = value * value_weight;
     double total_weight = value_weight;
+    // If no chunks have been recorded, the weight of the past QoE is 0 anyways.
     if (num_past_recorded_chunks > 0) {
         avg_est_qoe += (get_past_qoe()) * past_qoe_weight/(num_past_recorded_chunks);
     }
@@ -472,8 +485,8 @@ double ClientData::average_expected_qoe(QuicBandwidth rate) {
 
 void ClientData::set_inverse_function_file(const std::string& filename) {
     DLOG(INFO) << "Loading normalization function from " << NORMALIZER_FN_DIR << filename;
-    maxmin_util_inverse_fn_.LoadFromFile(NORMALIZER_FN_DIR + filename);
-    DLOG(INFO) << "Normalization function test probe 2.47: " << maxmin_util_inverse_fn_.Eval(2.47);
+    util_inverse_fn_.LoadFromFile(NORMALIZER_FN_DIR + filename);
+    DLOG(INFO) << "Normalization function test probe 2.47: " << util_inverse_fn_.Eval(2.47);
 }
 
 double ClientData::generic_fn_inverse(const vector<vector<double>>& table, double val) {
@@ -497,18 +510,7 @@ double ClientData::generic_fn_inverse(const vector<vector<double>>& table, doubl
 }
 
 float ClientData::normalize_utility(float arg) {
-    switch (opt_target_) {
-        case maxmin:
-            /*if (arg < 0) {
-                // Interpolates between 0.1 and 0.
-                return 0.1 * exp(arg);
-            }*/
-            return maxmin_util_inverse_fn_.Eval(arg) / 2; 
-        case sum:
-            return sum_util_inverse_fn_.Eval(arg) / 2;
-        case propfair:
-            return arg;
-    }
+    return util_inverse_fn_.Eval(arg) / 2; 
 }
 
 }  // namespace net

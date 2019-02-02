@@ -76,6 +76,9 @@ class QUIC_EXPORT_PRIVATE ClientData {
   // The average utility over all chunks at this bitrate.
   double average_utility_for_bitrate(int bitrate);
   double qoe(int bitrate, double rebuf_time, int prev_bitrate);
+  // Given a rate, computes some function of U' / U, that can be equalized to
+  // target proportional fairness.
+  double propfair_utility(QuicBandwidth rate);
   // Uses the utility function to find the next 5 bitrates we would fetch under optimal conditions.
   // Returns the average of these bitrates.
   double future_avg_bitrate(QuicBandwidth rate);
@@ -140,9 +143,7 @@ class QUIC_EXPORT_PRIVATE ClientData {
   bool value_func_loaded_;
   // If we're optimizing for max-min fairness, this is the `inverse function' we use
   // so that the average multiplier is equal to TCP's multiplier when in the steady state.  
-  FunctionTable maxmin_util_inverse_fn_;
-  // Likewise, but if we're using sum of QoEs as the metric.
-  FunctionTable sum_util_inverse_fn_;
+  FunctionTable util_inverse_fn_;
 };
 
 }  // namespace net
